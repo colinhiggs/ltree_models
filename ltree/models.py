@@ -5,6 +5,10 @@ from sqlalchemy import (
     Text,
 )
 
+__all__ = (
+    'class_factory',
+)
+
 class NodeBase:
     def __repr__(self):
        return f"{self.__class__.__name__}(id={self.id!r}, name={self.name!r}, path={self._path!r})"

@@ -2,6 +2,14 @@ from sqlalchemy import (
     text,
 )
 
+
+__all__ = (
+    'add_ltree_extension',
+    'free_path_text',
+    'add_free_path_function',
+)
+
+
 def add_ltree_extension(engine):
     engine.execute(text("CREATE EXTENSION IF NOT EXISTS ltree;"))
 
