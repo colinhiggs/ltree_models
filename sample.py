@@ -42,7 +42,7 @@ ses.add(top)
 a = Node(name='A', _path=Ltree('001000.001000'))
 ses.add(a)
 b = Node(name='B', _path=Ltree('001000.002000'))
-ses.add(a2)
+ses.add(b)
 
 ses.commit()
 
