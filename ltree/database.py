@@ -11,7 +11,8 @@ __all__ = (
 
 
 def add_ltree_extension(engine):
-    engine.execute(text("CREATE EXTENSION IF NOT EXISTS ltree;"))
+    with engine.begin() as con:
+        con.execute(text("CREATE EXTENSION IF NOT EXISTS ltree;"))
 
 
 def free_path_text(
@@ -19,7 +20,7 @@ def free_path_text(
     max_digits=64, step_digits=48,
     ):
     format_text = 'FM' + '0' * max_digits
-    return f'''
+    return text(f'''
 CREATE OR REPLACE FUNCTION public.{func_name}(parent ltree, after ltree DEFAULT NULL::ltree)
     RETURNS ltree
     LANGUAGE plpgsql
@@ -34,7 +35,7 @@ DECLARE
     max_pos numeric := 1e{max_digits} - 1;
 BEGIN
 IF NOT (
-    after IS NULL OR after = '__START__' OR
+    after IS NULL OR after = '__LAST__' OR after = '__FIRST__' OR
     ( parent_level = (nlevel(after)-1) AND parent @> after )
 ) THEN
     RAISE EXCEPTION '% is not a child of %', after, parent;
@@ -42,33 +43,39 @@ END IF;
 IF after IS NULL OR after = '__LAST__' THEN
     -- Passing NULL as after means after should be set to whatever the last node
     -- is, which might still be NULL if there aren't any nodes at this level yet.
+    IF after = '__LAST__' THEN
+        after := NULL;
+    END IF;
     after := path from {table_name}
     WHERE parent @> path AND parent_level = (nlevel(path) - 1)
     ORDER BY path DESC
     LIMIT 1;
-    after := NULL;
-ELSEIF after = '__START__' THEN
-    -- Passing __START__ as after means find a position before the first node.
+ELSEIF after = '__FIRST__' THEN
+    -- Passing __FIRST__ as after means find a position before the first node.
     before := path from {table_name}
     WHERE parent @> path AND parent_level = (nlevel(path) - 1)
     ORDER BY path
     LIMIT 1;
     after := NULL;
 ELSE
-    after_pos := subpath(after, -1)::text::numeric;
     -- Make sure after has the correct number of digits so that lexical sorting
     -- works.
-    after := parent || to_char(after_pos, '{format_text}')::ltree;
+    -- after := parent || to_char(after_pos, '{format_text}')::ltree;
     before := path from {table_name}
     WHERE parent @> path AND parent_level = (nlevel(path) - 1) AND path > after
     ORDER BY path
     LIMIT 1;
 END IF;
-RAISE NOTICE 'after: %, before: %', after, before;
+-- RAISE NOTICE 'after: %, before: %', after, before;
+IF after IS NOT NULL THEN
+    after_pos := subpath(after, -1)::text::numeric;
+END IF;
 IF after IS NULL AND before IS NULL THEN
     -- There are no child nodes of parent. Choose half way between top of range and 0.
-    RETURN parent || to_char(round(max_pos/2), '{format_text}')::ltree;
+    next_pos := round(max_pos/2);
 ELSEIF before IS NULL THEN
+    -- RAISE NOTICE 'looking for a spot after %', after;
+    -- RAISE NOTICE 'after_pos: %', after_pos;
     -- Find a spot after after.
     IF after_pos = max_pos THEN
         RAISE EXCEPTION 'Out of space after %', after;
@@ -76,7 +83,7 @@ ELSEIF before IS NULL THEN
         -- special case when only one away from the top.
         next_pos = max_pos;
     ELSE
-        IF after_pos + big_step_pos > max_pos THEN
+        IF after_pos + big_step_pos > round((after_pos + max_pos) / 2) THEN
             next_pos := round((after_pos + max_pos) / 2);
         ELSE
             next_pos := after_pos + big_step_pos;
@@ -91,7 +98,7 @@ ELSEIF after IS NULL THEN
         -- special case when only one space left at the bottom.
         next_pos = 0;
     ELSE
-        IF before_pos - big_step_pos < 0 THEN
+        IF before_pos - big_step_pos < round(before_pos / 2) THEN
             next_pos := round(before_pos / 2);
         ELSE
             next_pos := before_pos - big_step_pos;
@@ -108,7 +115,7 @@ END IF;
 RETURN parent || to_char(next_pos, '{format_text}')::ltree;
 END;
 $function$
-'''
+''')
 
 
 def add_free_path_function(
@@ -116,6 +123,7 @@ def add_free_path_function(
     table_name='oltree_nodes', func_name='oltree_free_path',
     max_digits=64, step_digits=48,
     ):
-    engine.execute(text(
-        free_path_text(table_name, func_name, max_digits, step_digits)
-    ))
+    with engine.begin() as con:
+        con.execute(
+            free_path_text(table_name, func_name, max_digits, step_digits)
+        )

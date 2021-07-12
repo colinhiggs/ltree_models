@@ -11,7 +11,7 @@ __all__ = (
 
 class NodeBase:
     def __repr__(self):
-       return f"{self.__class__.__name__}(id={self.id!r}, name={self.name!r}, path={self._path!r})"
+       return f"{self.__class__.__name__}(id={self.id!r}, name={self.name!r}, path={self.path!r})"
 
 
 def class_factory(base, id_type, tablename = 'oltree_nodes'):
@@ -21,7 +21,7 @@ def class_factory(base, id_type, tablename = 'oltree_nodes'):
         '__tablename__': tablename,
         'id': id_type,
         'name': Column(Text, nullable=False),
-        '_path': Column(LtreeType, nullable=False, unique=True),
+        'path': Column(LtreeType, nullable=False, unique=True),
     }
 
     LtreeNode = type('LtreeNode', (base, NodeBase), class_attrs)

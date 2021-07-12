@@ -1,3 +1,4 @@
+import logging
 import ltree
 import sys
 import testing.postgresql
@@ -13,7 +14,13 @@ from sqlalchemy.orm import (
     Query as BaseQuery,
     Session
 )
-from statistics import mean
+from sqlalchemy.sql import (
+    select,
+    func,
+)
+
+logging.basicConfig()   # log messages to stdout
+logging.getLogger('sqlalchemy.dialects.postgresql').setLevel(logging.INFO)
 
 Base = declarative_base()
 
@@ -23,32 +30,32 @@ db = testing.postgresql.Postgresql(
     base_dir='.',
 )
 
-def half_way(left, right):
-    left = list(map(int, left.split('_')))
-    right = list(map(int, right.split('_')))
-    print(left, right)
-    avg = list(map(mean, zip(left, right)))
-    print(avg)
-
-
-engine = create_engine(db.url(), echo=True)
+engine = create_engine(db.url(), echo=False)
 ltree.add_ltree_extension(engine)
 Base.metadata.drop_all(engine)
 Base.metadata.create_all(engine)
+with engine.begin() as con:
+    con.execute(ltree.free_path_text(max_digits=6, step_digits=3))
 ses = Session(engine)
 
-top = Node(name='Top', _path=Ltree('001000'))
-ses.add(top)
-a = Node(name='A', _path=Ltree('001000.001000'))
-ses.add(a)
-b = Node(name='B', _path=Ltree('001000.002000'))
-ses.add(b)
-
+root = Node(name='root', path=Ltree('r'))
+ses.add(root)
+for i in range(510):
+    ses.add(Node(name=str(i), path=func.oltree_free_path('r')))
+# a = Node(name='A', path=Ltree('r.001000'))
+# ses.add(a)
+# b = Node(name='B', path=Ltree('r.002000'))
+# ses.add(b)
 ses.commit()
-
 q = ses.query(Node)
-
 for node in q.all():
     print(node)
 
+# with engine.begin() as con:
+#     res = con.execute(select(text("oltree_free_path('r')")))
+#     for row in res:
+#         print(row)
+
+print(db.url())
+# input('enter to quit...')
 db.stop()
