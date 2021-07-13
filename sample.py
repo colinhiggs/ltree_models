@@ -3,6 +3,7 @@ import ltree
 import sys
 import testing.postgresql
 
+from itertools import islice
 from sqlalchemy_utils import LtreeType, Ltree
 from sqlalchemy import (
     Column, Integer, String,
@@ -47,14 +48,41 @@ for i in range(510):
 # b = Node(name='B', path=Ltree('r.002000'))
 # ses.add(b)
 ses.commit()
-q = ses.query(Node)
-for node in q.all():
+q = ses.query(Node).order_by(Node.path.desc()).limit(10)
+for node in reversed(q.all()):
+    print(node)
+ses.close()
+
+with engine.begin() as con:
+    res = con.execute(text(
+"""
+WITH ordinals AS (
+    SELECT
+        row_number() OVER (ORDER BY path) as row,
+        path,
+        subpath(path,-1)::text::numeric as index
+    FROM oltree_nodes
+    WHERE 'r' @> path and path != 'r'
+), max_ordinal AS (
+    SELECT max(row) from ordinals
+)
+-- SELECT row, index, 'r' || to_char(round(ordinals.row * (1000000 / (max_ordinal.max+1))), 'FM000000')::ltree FROM ordinals, max_ordinal
+-- ORDER BY index DESC LIMIT 10
+UPDATE oltree_nodes
+SET path = 'r' || to_char(round(ordinals.row * (1000000 / (max_ordinal.max+1))), 'FM000000')::ltree
+FROM ordinals, max_ordinal
+WHERE oltree_nodes.path = ordinals.path
+RETURNING oltree_nodes.id, oltree_nodes.path, ordinals.path
+"""
+    ))
+    for row in islice(res, 0, 10):
+        print(row)
+
+ses = Session(engine)
+q = ses.query(Node).order_by(Node.path.desc()).limit(10)
+for node in reversed(q.all()):
     print(node)
 
-# with engine.begin() as con:
-#     res = con.execute(select(text("oltree_free_path('r')")))
-#     for row in res:
-#         print(row)
 
 print(db.url())
 # input('enter to quit...')
