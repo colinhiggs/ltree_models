@@ -3,6 +3,7 @@ from sqlalchemy_utils import LtreeType, Ltree
 from sqlalchemy import (
     Column,
     Text,
+    Index,
 )
 
 __all__ = (
@@ -25,5 +26,6 @@ def class_factory(base, id_type, tablename = 'oltree_nodes'):
     }
 
     LtreeNode = type('LtreeNode', (base, NodeBase), class_attrs)
+    Index(f'{tablename}_path_idx', LtreeNode.path, postgresql_using='gist')
 
     return LtreeNode
