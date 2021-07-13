@@ -6,7 +6,7 @@ from sqlalchemy import (
 __all__ = (
     'add_ltree_extension',
     'free_path_text',
-    'add_free_path_function',
+    'rebalance_text',
 )
 
 
@@ -117,6 +117,42 @@ END;
 $function$
 ''')
 
+
+def rebalance_text(
+    table_name='oltree_nodes', func_name='oltree_rebalance',
+    max_digits=64, step_digits=48,
+    ):
+    format_text = 'FM' + '0' * max_digits
+    return text(f'''
+CREATE OR REPLACE PROCEDURE public.{func_name}(parent ltree)
+    LANGUAGE plpgsql
+AS $procedure$
+DECLARE
+    parent_level int := nlevel(parent);
+    max_pos numeric := 1e{max_digits} - 1;
+BEGIN
+WITH ordinals AS (
+    SELECT
+        row_number() OVER (ORDER BY path) as row,
+        path,
+        subpath(path, nlevel(path)-1, 1)::text::numeric as index
+    FROM {table_name}
+    WHERE parent @> path and nlevel(path) > parent_level
+), max_ordinal AS (
+    SELECT max(row) from ordinals
+)
+UPDATE {table_name}
+SET
+    path = parent ||
+    to_char(
+        round(ordinals.row * ((max_pos + 1) / (max_ordinal.max + 1))),
+        '{format_text}'
+    )::ltree
+FROM ordinals, max_ordinal
+WHERE oltree_nodes.path = ordinals.path;
+END;
+$procedure$
+''')
 
 def add_free_path_function(
     engine,
