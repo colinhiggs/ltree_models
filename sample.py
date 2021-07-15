@@ -29,36 +29,27 @@ Node = ltree.class_factory(Base, Column(Integer, primary_key=True))
 
 db = testing.postgresql.Postgresql(
     base_dir='.',
+    port=8654,
 )
 
 engine = create_engine(db.url(), echo=False)
 ltree.add_ltree_extension(engine)
 Base.metadata.drop_all(engine)
 Base.metadata.create_all(engine)
-with engine.begin() as con:
-    con.execute(ltree.free_path_text(max_digits=6, step_digits=3))
-    con.execute(ltree.rebalance_text(max_digits=6, step_digits=3))
-ses = Session(engine)
+ltree.add_oltree_functions(engine, max_digits=16, step_digits=8)
 
+# print(db.url())
+# input('enter to quit...')
+
+ses = Session(engine)
 root = Node(name='root', path=Ltree('r'))
 ses.add(root)
-for i in range(1000):
-    try:
-        ses.add(Node(name=str(i), path=func.oltree_free_path('r')))
-        ses.commit()
-    except Exception as e:
-        ses.close()
-        with engine.begin() as con:
-            con.execute(text("CALL oltree_rebalance('r')"))
-        ses = Session(engine)
-        ses.add(Node(name=str(i), path=func.oltree_free_path('r')))
-        ses.commit()
-# a = Node(name='A', path=Ltree('r.001000'))
-# ses.add(a)
-# b = Node(name='B', path=Ltree('r.002000'))
-# ses.add(b)
-# ses.commit()
+ses.commit()
+for i in range(10000):
+    ses.add(Node(name=str(i), path=func.oltree_free_path_rebalance('r')))
+ses.commit()
 ses.close()
+
 ses = Session(engine)
 q = ses.query(Node).order_by(Node.path.desc()).limit(10)
 for node in reversed(q.all()):

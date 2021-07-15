@@ -2,12 +2,32 @@ from sqlalchemy import (
     text,
 )
 
+DEFAULT_PREFIX = 'oltree_'
+DEFAULT_POSTFIX = None
 
 __all__ = (
     'add_ltree_extension',
+    'add_oltree_functions',
     'free_path_text',
     'rebalance_text',
 )
+
+
+def wrap_name(base_name, prefix=DEFAULT_PREFIX, postfix=DEFAULT_POSTFIX):
+    '''
+    Wraps a name with a prefix and a postfix.
+    '''
+    if prefix is None:
+        prefix = ''
+    elif not prefix.endswith('_'):
+        prefix = prefix + '_'
+
+    if postfix is None:
+        postfix = ''
+    elif not postfix.startswith('_'):
+        postfix = '_' + postfix
+
+    return f'{prefix}{base_name}{postfix}'
 
 
 def add_ltree_extension(engine):
@@ -16,9 +36,11 @@ def add_ltree_extension(engine):
 
 
 def free_path_text(
-    table_name='oltree_nodes', func_name='oltree_free_path',
+    table_name='oltree_nodes',
+    func_prefix=DEFAULT_PREFIX, func_postfix=DEFAULT_POSTFIX,
     max_digits=64, step_digits=48,
     ):
+    func_name = wrap_name('free_path', prefix=func_prefix, postfix=func_postfix)
     format_text = 'FM' + '0' * max_digits
     return text(f'''
 CREATE OR REPLACE FUNCTION public.{func_name}(parent ltree, after ltree DEFAULT NULL::ltree)
@@ -78,7 +100,8 @@ ELSEIF before IS NULL THEN
     -- RAISE NOTICE 'after_pos: %', after_pos;
     -- Find a spot after after.
     IF after_pos = max_pos THEN
-        RAISE EXCEPTION 'Out of space after %', after;
+        RAISE EXCEPTION 'Out of space after %', after
+        USING ERRCODE = 'indicator_overflow';
     ELSEIF after_pos = max_pos - 1 THEN
         -- special case when only one away from the top.
         next_pos = max_pos;
@@ -93,7 +116,8 @@ ELSEIF after IS NULL THEN
     -- Find a spot before before.
     before_pos = subpath(before, -1)::text::numeric;
     IF before_pos = 0 THEN
-        RAISE EXCEPTION 'Out of space before %', before;
+        RAISE EXCEPTION 'Out of space before %', before
+        USING ERRCODE = 'indicator_overflow';
     ELSEIF before_pos = 1 THEN
         -- special case when only one space left at the bottom.
         next_pos = 0;
@@ -109,7 +133,8 @@ ELSE
     before_pos := subpath(before, -1)::text::numeric;
     next_pos := round((after_pos + before_pos)/2);
     IF next_pos = after_pos OR next_pos = before_pos THEN
-        RAISE EXCEPTION 'Out of space between % and %', after, before;
+        RAISE EXCEPTION 'Out of space between % and %', after, before
+        USING ERRCODE = 'indicator_overflow';
     END IF;
 END IF;
 RETURN parent || to_char(next_pos, '{format_text}')::ltree;
@@ -119,9 +144,11 @@ $function$
 
 
 def rebalance_text(
-    table_name='oltree_nodes', func_name='oltree_rebalance',
+    table_name='oltree_nodes',
+    func_prefix=DEFAULT_PREFIX, func_postfix=DEFAULT_POSTFIX,
     max_digits=64, step_digits=48,
     ):
+    func_name = wrap_name('rebalance', prefix=func_prefix, postfix=func_postfix)
     format_text = 'FM' + '0' * max_digits
     return text(f'''
 CREATE OR REPLACE PROCEDURE public.{func_name}(parent ltree)
@@ -130,36 +157,79 @@ AS $procedure$
 DECLARE
     parent_level int := nlevel(parent);
     max_pos numeric := 1e{max_digits} - 1;
+    step numeric;
+    n_children numeric := 1;
 BEGIN
+n_children := COUNT(*) FROM {table_name}
+    WHERE parent @> path and parent_level = nlevel(path) - 1;
+step := ((max_pos + 1) / (n_children + 2));
+RAISE NOTICE 'children % / %, step: %', n_children, (max_pos), step;
+IF step <= 1 THEN
+    RAISE EXCEPTION 'out of space rebalancing %', parent
+    USING ERRCODE = 'indicator_overflow';
+END IF;
 WITH ordinals AS (
     SELECT
         row_number() OVER (ORDER BY path) as row,
-        path,
-        subpath(path, nlevel(path)-1, 1)::text::numeric as index
+        path
     FROM {table_name}
-    WHERE parent @> path and nlevel(path) > parent_level
-), max_ordinal AS (
-    SELECT max(row) from ordinals
+    WHERE parent @> path and parent_level = nlevel(path) - 1
 )
 UPDATE {table_name}
 SET
-    path = parent ||
-    to_char(
-        round(ordinals.row * ((max_pos + 1) / (max_ordinal.max + 1))),
-        '{format_text}'
+    path = parent || to_char(
+        round(ordinals.row * step), '{format_text}'
     )::ltree
-FROM ordinals, max_ordinal
+FROM ordinals
 WHERE oltree_nodes.path = ordinals.path;
 END;
 $procedure$
 ''')
 
-def add_free_path_function(
-    engine,
-    table_name='oltree_nodes', func_name='oltree_free_path',
+def free_path_rebalance_text(
+    table_name='oltree_nodes',
+    func_prefix=DEFAULT_PREFIX, func_postfix=DEFAULT_POSTFIX,
     max_digits=64, step_digits=48,
     ):
-    with engine.begin() as con:
-        con.execute(
-            free_path_text(table_name, func_name, max_digits, step_digits)
-        )
+    func_name = wrap_name('free_path_rebalance', prefix=func_prefix, postfix=func_postfix)
+    rebalance_name = wrap_name('rebalance', prefix=func_prefix, postfix=func_postfix)
+    free_path_name = wrap_name('free_path', prefix=func_prefix, postfix=func_postfix)
+    format_text = 'FM' + '0' * max_digits
+    return text(f'''
+CREATE OR REPLACE FUNCTION public.{func_name}(parent ltree, after ltree DEFAULT NULL::ltree)
+    RETURNS ltree
+    LANGUAGE plpgsql
+AS $function$
+BEGIN
+RETURN {free_path_name}(parent, after);
+EXCEPTION
+    WHEN indicator_overflow THEN
+        RAISE NOTICE 'rebalancing %', parent;
+        CALL {rebalance_name}(parent);
+        RETURN {free_path_name}(parent, after);
+END;
+$function$
+''')
+
+def add_oltree_functions(
+    engine,
+    table_name='oltree_nodes', func_prefix='oltree_', func_postfix=None,
+    max_digits=64, step_digits=48,
+    ):
+    fnames = (
+        'free_path',
+        'rebalance',
+        'free_path_rebalance',
+    )
+
+    for fname in fnames:
+        with engine.begin() as con:
+            con.execute(
+                globals()[f'{fname}_text'](
+                    table_name=table_name,
+                    func_prefix=func_prefix,
+                    func_postfix=func_postfix,
+                    max_digits=max_digits,
+                    step_digits=step_digits
+                )
+            )
