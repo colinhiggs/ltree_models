@@ -45,7 +45,7 @@ ses = Session(engine)
 root = Node(name='root', path=Ltree('r'))
 ses.add(root)
 ses.commit()
-for i in range(10000):
+for i in range(1000):
     ses.add(Node(name=str(i), path=func.oltree_free_path_rebalance('r')))
 ses.commit()
 ses.close()

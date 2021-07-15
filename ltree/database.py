@@ -4,6 +4,9 @@ from sqlalchemy import (
 
 DEFAULT_PREFIX = 'oltree_'
 DEFAULT_POSTFIX = None
+DEFAULT_TABLE_NAME = 'nodes'
+DEFAULT_MAX_DIGITS = 16
+DEFAULT_STEP_DIGITS = 8
 
 __all__ = (
     'add_ltree_extension',
@@ -31,16 +34,20 @@ def wrap_name(base_name, prefix=DEFAULT_PREFIX, postfix=DEFAULT_POSTFIX):
 
 
 def add_ltree_extension(engine):
+    '''
+    Add the ltree extension to the database.
+    '''
     with engine.begin() as con:
         con.execute(text("CREATE EXTENSION IF NOT EXISTS ltree;"))
 
 
 def free_path_text(
-    table_name='oltree_nodes',
-    func_prefix=DEFAULT_PREFIX, func_postfix=DEFAULT_POSTFIX,
-    max_digits=64, step_digits=48,
+    table_name=DEFAULT_TABLE_NAME,
+    prefix=DEFAULT_PREFIX, postfix=DEFAULT_POSTFIX,
+    max_digits=DEFAULT_MAX_DIGITS, step_digits=DEFAULT_STEP_DIGITS,
     ):
-    func_name = wrap_name('free_path', prefix=func_prefix, postfix=func_postfix)
+    table_name = wrap_name(table_name, prefix=prefix, postfix=postfix)
+    func_name = wrap_name('free_path', prefix=prefix, postfix=postfix)
     format_text = 'FM' + '0' * max_digits
     return text(f'''
 CREATE OR REPLACE FUNCTION public.{func_name}(parent ltree, after ltree DEFAULT NULL::ltree)
@@ -144,11 +151,12 @@ $function$
 
 
 def rebalance_text(
-    table_name='oltree_nodes',
-    func_prefix=DEFAULT_PREFIX, func_postfix=DEFAULT_POSTFIX,
-    max_digits=64, step_digits=48,
+    table_name=DEFAULT_TABLE_NAME,
+    prefix=DEFAULT_PREFIX, postfix=DEFAULT_POSTFIX,
+    max_digits=DEFAULT_MAX_DIGITS, step_digits=DEFAULT_STEP_DIGITS,
     ):
-    func_name = wrap_name('rebalance', prefix=func_prefix, postfix=func_postfix)
+    table_name = wrap_name(table_name, prefix=prefix, postfix=postfix)
+    func_name = wrap_name('rebalance', prefix=prefix, postfix=postfix)
     format_text = 'FM' + '0' * max_digits
     return text(f'''
 CREATE OR REPLACE PROCEDURE public.{func_name}(parent ltree)
@@ -187,13 +195,14 @@ $procedure$
 ''')
 
 def free_path_rebalance_text(
-    table_name='oltree_nodes',
-    func_prefix=DEFAULT_PREFIX, func_postfix=DEFAULT_POSTFIX,
-    max_digits=64, step_digits=48,
+    table_name=DEFAULT_TABLE_NAME,
+    prefix=DEFAULT_PREFIX, postfix=DEFAULT_POSTFIX,
+    max_digits=DEFAULT_MAX_DIGITS, step_digits=DEFAULT_STEP_DIGITS,
     ):
-    func_name = wrap_name('free_path_rebalance', prefix=func_prefix, postfix=func_postfix)
-    rebalance_name = wrap_name('rebalance', prefix=func_prefix, postfix=func_postfix)
-    free_path_name = wrap_name('free_path', prefix=func_prefix, postfix=func_postfix)
+    table_name = wrap_name(table_name, prefix=prefix, postfix=postfix)
+    func_name = wrap_name('free_path_rebalance', prefix=prefix, postfix=postfix)
+    rebalance_name = wrap_name('rebalance', prefix=prefix, postfix=postfix)
+    free_path_name = wrap_name('free_path', prefix=prefix, postfix=postfix)
     format_text = 'FM' + '0' * max_digits
     return text(f'''
 CREATE OR REPLACE FUNCTION public.{func_name}(parent ltree, after ltree DEFAULT NULL::ltree)
@@ -213,8 +222,9 @@ $function$
 
 def add_oltree_functions(
     engine,
-    table_name='oltree_nodes', func_prefix='oltree_', func_postfix=None,
-    max_digits=64, step_digits=48,
+    table_name=DEFAULT_TABLE_NAME,
+    prefix=DEFAULT_PREFIX, postfix=DEFAULT_POSTFIX,
+    max_digits=DEFAULT_MAX_DIGITS, step_digits=DEFAULT_STEP_DIGITS,
     ):
     fnames = (
         'free_path',
@@ -227,8 +237,8 @@ def add_oltree_functions(
             con.execute(
                 globals()[f'{fname}_text'](
                     table_name=table_name,
-                    func_prefix=func_prefix,
-                    func_postfix=func_postfix,
+                    prefix=prefix,
+                    postfix=postfix,
                     max_digits=max_digits,
                     step_digits=step_digits
                 )
