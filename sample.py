@@ -32,6 +32,13 @@ db = testing.postgresql.Postgresql(
     port=8654,
 )
 
+# Required to be able to use ltree objects directly in queries and functions.
+# See https://github.com/kvesteri/sqlalchemy-utils/issues/430
+import psycopg2
+psycopg2.extensions.register_adapter(
+    Ltree, lambda ltree: psycopg2.extensions.QuotedString(str(ltree))
+)
+
 engine = create_engine(db.url(), echo=False)
 ltree.add_ltree_extension(engine)
 Base.metadata.drop_all(engine)
@@ -45,8 +52,8 @@ ses = Session(engine)
 root = Node(name='root', path=Ltree('r'))
 ses.add(root)
 ses.commit()
-for i in range(1000):
-    ses.add(Node(name=str(i), path=func.oltree_free_path_rebalance('r')))
+for i in range(10):
+    ses.add(Node(name=str(i), path=func.oltree_free_path_rebalance(root.path, '__FIRST__')))
 ses.commit()
 ses.close()
 
