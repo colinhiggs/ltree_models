@@ -21,6 +21,13 @@ __all__ = (
 )
 
 
+# class PathIndexer(type):
+#     def __init__(cls, name, bases, clsdict):
+#         super(PathIndexer, cls).__init__(name, bases, clsdict)
+#         print("adding index")
+#         cls.add_path_index()
+
+
 class OLtreeMixin:
     path = Column(LtreeType, nullable=False)
     __table_args__ = (
@@ -30,6 +37,10 @@ class OLtreeMixin:
     @declared_attr
     def parent(self):
         return column_property(func.subpath(self.path, 0, -1))
+
+    @classmethod
+    def add_path_index(cls):
+        Index(f'{cls.__tablename__}_path_idx', cls.path, postgresql_using='gist')
 
     def __repr__(self):
         return f"{self.__class__.__name__}(id={self.id!r}, name={self.name!r}, path={self.path!r})"  # pylint: disable=no-member
