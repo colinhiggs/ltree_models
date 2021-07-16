@@ -12,9 +12,8 @@ __all__ = (
 )
 
 
-class NodeBase:
-    def __repr__(self):
-        return f"{self.__class__.__name__}(id={self.id!r}, name={self.name!r}, path={self.path!r})"  # pylint: disable=no-member
+def _repr(self):
+    return f"{self.__class__.__name__}(id={self.id!r}, name={self.name!r}, path={self.path!r})"
 
 
 def class_factory(base, id_type, tablename='oltree_nodes'):
@@ -27,10 +26,11 @@ def class_factory(base, id_type, tablename='oltree_nodes'):
         'path': Column(LtreeType, nullable=False),
         '__table_args__': (
             UniqueConstraint('path', deferrable=True, initially='immediate'),
-        )
+        ),
+        '__repr__': _repr,
     }
 
-    LtreeNode = type('LtreeNode', (base, NodeBase), class_attrs)
+    LtreeNode = type('LtreeNode', (base, ), class_attrs)
     Index(f'{tablename}_path_idx', LtreeNode.path, postgresql_using='gist')
 
     return LtreeNode
