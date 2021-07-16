@@ -1,6 +1,7 @@
 import ltree
-import unittest
+import os
 import testing.postgresql
+import unittest
 
 from sqlalchemy import (
     create_engine,
@@ -23,7 +24,7 @@ from sqlalchemy.orm import (
 from sqlalchemy.schema import DropTable
 from sqlalchemy.sql.functions import GenericFunction
 
-debugging = False
+debugging = os.environ.get('DEBUGGING')
 
 # Required to be able to use ltree objects directly in queries and functions.
 # See https://github.com/kvesteri/sqlalchemy-utils/issues/430
@@ -40,7 +41,7 @@ def _compile_drop_table(element, compiler, **kwargs):
 
 def balanced_paths(self, parent, i, n_children):
     step = round(((self.max_number + 1) / (n_children + 1)))
-    return parent.path + Ltree(f'{(step * i)}')
+    return parent.path + Ltree(f'{(step * (i + 1)):0{self.max_digits}d}')
 
 
 def free_path_rebalance_paths(self, parent, i, n_children):
@@ -122,16 +123,19 @@ class DBBase(unittest.TestCase):
             self.recursive_add_children(s, root, depth, n_children, path_chooser)
             s.commit()
 
+    def print_tree(self):
+        with Session(self.engine, future=True) as s:
+            for o in s.execute(select(self.Node).order_by(self.Node.path)).scalars().all():
+                print(o)
+
 
 @unittest.skipUnless(debugging, 'Not debugging')
 class Debugging(DBBase):
 
     def test_print_tree(self):
-        self.populate(2, 3, free_path_rebalance_paths)
-        with Session(engine, future=True) as s:
-            for o in s.execute(select(self.Node)).scalars().all():
-                print(o)
-
+        self.set_digits(4,2)
+        self.populate(2, 3, balanced_paths)
+        self.print_tree()
 
 @unittest.skipIf(debugging, 'debugging')
 class DBFunctions(DBBase):
