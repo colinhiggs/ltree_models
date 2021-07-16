@@ -13,6 +13,11 @@ __all__ = (
     'add_oltree_functions',
     'free_path_text',
     'rebalance_text',
+    'DEFAULT_PREFIX',
+    'DEFAULT_POSTFIX',
+    'DEFAULT_TABLE_NAME',
+    'DEFAULT_MAX_DIGITS',
+    'DEFAULT_STEP_DIGITS',
 )
 
 
