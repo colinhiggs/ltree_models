@@ -175,7 +175,7 @@ DECLARE
 BEGIN
 n_children := COUNT(*) FROM {table_name}
     WHERE parent @> path and parent_level = nlevel(path) - 1;
-step := ((max_pos + 1) / (n_children + 2));
+step := ((max_pos + 1) / (n_children + 1));
 RAISE NOTICE 'children % / %, step: %', n_children, (max_pos), step;
 IF step <= 1 THEN
     RAISE EXCEPTION 'out of space rebalancing %', parent
