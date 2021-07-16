@@ -11,13 +11,13 @@ __all__ = (
     'class_factory',
 )
 
+
 class NodeBase:
     def __repr__(self):
-       return f"{self.__class__.__name__}(id={self.id!r}, name={self.name!r}, path={self.path!r})"  # pylint: disable=no-member
+        return f"{self.__class__.__name__}(id={self.id!r}, name={self.name!r}, path={self.path!r})"  # pylint: disable=no-member
 
 
-
-def class_factory(base, id_type, tablename = 'oltree_nodes'):
+def class_factory(base, id_type, tablename='oltree_nodes'):
     if not isinstance(id_type, Column):
         id_type = Column(id_type, primary_key=True)
     class_attrs = {

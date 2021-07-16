@@ -50,7 +50,7 @@ def free_path_text(
     table_name=DEFAULT_TABLE_NAME,
     prefix=DEFAULT_PREFIX, postfix=DEFAULT_POSTFIX,
     max_digits=DEFAULT_MAX_DIGITS, step_digits=DEFAULT_STEP_DIGITS,
-    ):
+):
     table_name = wrap_name(table_name, prefix=prefix, postfix=postfix)
     func_name = wrap_name('free_path', prefix=prefix, postfix=postfix)
     format_text = 'FM' + '0' * max_digits
@@ -159,7 +159,7 @@ def rebalance_text(
     table_name=DEFAULT_TABLE_NAME,
     prefix=DEFAULT_PREFIX, postfix=DEFAULT_POSTFIX,
     max_digits=DEFAULT_MAX_DIGITS, step_digits=DEFAULT_STEP_DIGITS,
-    ):
+):
     table_name = wrap_name(table_name, prefix=prefix, postfix=postfix)
     func_name = wrap_name('rebalance', prefix=prefix, postfix=postfix)
     format_text = 'FM' + '0' * max_digits
@@ -199,11 +199,12 @@ END;
 $procedure$
 ''')
 
+
 def free_path_rebalance_text(
     table_name=DEFAULT_TABLE_NAME,
     prefix=DEFAULT_PREFIX, postfix=DEFAULT_POSTFIX,
     max_digits=DEFAULT_MAX_DIGITS, step_digits=DEFAULT_STEP_DIGITS,
-    ):
+):
     table_name = wrap_name(table_name, prefix=prefix, postfix=postfix)
     func_name = wrap_name('free_path_rebalance', prefix=prefix, postfix=postfix)
     rebalance_name = wrap_name('rebalance', prefix=prefix, postfix=postfix)
@@ -225,12 +226,13 @@ END;
 $function$
 ''')
 
+
 def add_oltree_functions(
     engine,
     table_name=DEFAULT_TABLE_NAME,
     prefix=DEFAULT_PREFIX, postfix=DEFAULT_POSTFIX,
     max_digits=DEFAULT_MAX_DIGITS, step_digits=DEFAULT_STEP_DIGITS,
-    ):
+):
     fnames = (
         'free_path',
         'rebalance',
