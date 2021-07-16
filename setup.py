@@ -7,6 +7,7 @@ with open(os.path.join(here, 'README.md')) as f:
 
 requires = [
     'SQLAlchemy>=1.4',
+    'sqlalchemy_utils',
 ]
 
 tests_require = [
