@@ -144,7 +144,7 @@ class DBFunctions(DBBase):
 
     def test_free_path(self):
         self.set_digits(4,2)
-        self.populate(2,3)
+        self.populate(1,3)
         with Session(self.engine, future=True) as s:
             root = s.execute(
                 select(self.Node).where(self.Node.path==Ltree('r'))
@@ -175,3 +175,7 @@ class DBFunctions(DBBase):
                 s.execute(func.oltree_free_path(root.path, 'r.5000')).scalar_one()
             except sqlalchemy.exc.DataError as e:
                 s.rollback()
+
+    def test_rebalance(self):
+        self.set_digits(4,2)
+        self.populate(1,3)
