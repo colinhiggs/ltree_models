@@ -6,7 +6,8 @@ import testing.postgresql
 from itertools import islice
 from sqlalchemy_utils import LtreeType, Ltree
 from sqlalchemy import (
-    Column, Integer, String,
+    Column, Integer, String, Text,
+    Index,
     create_engine,
     text,
 )
@@ -25,7 +26,13 @@ logging.getLogger('sqlalchemy.dialects.postgresql').setLevel(logging.INFO)
 
 Base = declarative_base()
 
-Node = ltree.class_factory(Base, Column(Integer, primary_key=True))
+id_type = Integer
+class Node(Base, ltree.OLtreeMixin):
+    __tablename__ = 'oltree_nodes'
+    id = Column(id_type, primary_key=True)
+    name = Column(Text, nullable=False)
+
+Index(f'{Node.__tablename__}_path_idx', Node.path, postgresql_using='gist')
 
 db = testing.postgresql.Postgresql(
     base_dir='.',
@@ -60,7 +67,7 @@ ses.close()
 ses = Session(engine)
 q = ses.query(Node).order_by(Node.path.desc()).limit(10)
 for node in reversed(q.all()):
-    print(node)
+    print(node, node.parent)
 ses.close()
 
 

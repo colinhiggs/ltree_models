@@ -7,9 +7,12 @@ import unittest
 
 from sqlalchemy import (
     create_engine,
+    Column,
     engine,
+    Index,
     Integer,
     text,
+    Text,
     select,
     func,
 )
@@ -34,6 +37,15 @@ import psycopg2
 psycopg2.extensions.register_adapter(
     Ltree, lambda ltree: psycopg2.extensions.QuotedString(str(ltree))
 )
+
+id_type = Integer
+Base = declarative_base()
+class Node(Base, ltree.OLtreeMixin):
+    __tablename__ = 'oltree_nodes'
+    id = Column(id_type, primary_key=True)
+    name = Column(Text, nullable=False)
+
+Index(f'{Node.__tablename__}_path_idx', Node.path, postgresql_using='gist')
 
 # drops tables with cascade
 @compiles(DropTable, "postgresql")
@@ -63,13 +75,13 @@ def setUpModule():
     # Create a new database somewhere in /tmp
     global db
     global engine
-    global Base
-    global Node
+    # global Base
+    # global Node
     db = testing.postgresql.Postgresql()
     engine = create_engine(db.url(), future=True)
     ltree.add_ltree_extension(engine)
-    Base = declarative_base()
-    Node = ltree.class_factory(Base, Integer)
+
+    # Node = ltree.class_factory(Base, Integer)
 
 
 def tearDownModule():
@@ -82,8 +94,8 @@ class DBBase(unittest.TestCase):
     def setUp(self):
         global db
         global engine
-        global Base
-        global Node
+        # global Base
+        # global Node
         self.prefix = 'oltree'
         self.Node = Node
         self.engine = engine
@@ -91,7 +103,7 @@ class DBBase(unittest.TestCase):
         self.set_digits()
 
     def tearDown(self):
-        global Base
+        # global Base
         # global engine
         Base.metadata.drop_all(self.engine)
 
