@@ -41,13 +41,17 @@ def _compile_drop_table(element, compiler, **kwargs):
     return compiler.visit_drop_table(element) + " CASCADE"
 
 
-def balanced_paths(self, parent, i, n_children):
+def path_chooser_balanced(self, parent, i, n_children):
     step = round(((self.max_number + 1) / (n_children + 1)))
     return parent.path + Ltree(f'{(step * (i + 1)):0{self.max_digits}d}')
 
 
-def free_path_rebalance_paths(self, parent, i, n_children):
+def path_chooser_free_path_rebalance(self, parent, i, n_children):
     return func.oltree_free_path_rebalance(parent.path)
+
+
+def path_chooser_sequential(self, parent, i, n_children):
+    return parent.path + Ltree(str(i))
 
 
 # class oltree_free_path_rebalance(GenericFunction):
@@ -106,7 +110,7 @@ class DBBase(unittest.TestCase):
     def recursive_add_children(
         self, session,
         parent, depth, n_children,
-        path_chooser=balanced_paths
+        path_chooser=path_chooser_balanced
         ):
         if depth <= 0:
             return
@@ -118,16 +122,20 @@ class DBBase(unittest.TestCase):
             session.add(node)
             self.recursive_add_children(session, node, depth - 1, n_children, path_chooser=path_chooser)
 
-    def populate(self, depth, n_children, path_chooser=balanced_paths):
+    def populate(self, depth, n_children, path_chooser=path_chooser_balanced):
         with Session(self.engine, future=True) as s:
-            root = self.Node(name='root', path=Ltree('r'))
+            root = self.Node(name='r', path=Ltree('r'))
             s.add(root)
             self.recursive_add_children(s, root, depth, n_children, path_chooser)
             s.commit()
 
+    def all_nodes(self):
+        with Session(self.engine, future=True) as s:
+            return s.execute(select(self.Node).order_by(self.Node.path)).scalars().all()
+
     def print_tree(self):
         with Session(self.engine, future=True) as s:
-            for o in s.execute(select(self.Node).order_by(self.Node.path)).scalars().all():
+            for o in self.all_nodes():
                 print(o)
 
 
@@ -142,7 +150,10 @@ class Debugging(DBBase):
 @unittest.skipIf(debugging, 'debugging')
 class DBFunctions(DBBase):
 
-    def test_free_path(self):
+    def test_free_path_not_full(self):
+        '''
+        Should successfully find paths when there is space.
+        '''
         self.set_digits(4,2)
         self.populate(1,3)
         with Session(self.engine, future=True) as s:
@@ -158,6 +169,18 @@ class DBFunctions(DBBase):
             self.assertEqual(path_before, Ltree('r.2400'))
             path_between = s.execute(func.oltree_free_path(root.path, 'r.5000')).scalar_one()
             self.assertEqual(path_between, Ltree('r.6250'))
+
+
+    def test_free_path_full(self):
+        '''
+        Should fail to find paths when there is no space at the specified point.
+        '''
+        self.set_digits(4,2)
+        self.populate(1,3)
+        with Session(self.engine, future=True) as s:
+            root = s.execute(
+                select(self.Node).where(self.Node.path==Ltree('r'))
+            ).scalar_one()
             # Deliberately create nodes with no adjacent spaces.
             s.add(self.Node(name='r.last', path=Ltree('r.9999')))
             s.add(self.Node(name='r.first', path=Ltree('r.0000')))
@@ -167,15 +190,46 @@ class DBFunctions(DBBase):
                 s.execute(func.oltree_free_path(root.path)).scalar_one()
             except sqlalchemy.exc.DataError as e:
                 s.rollback()
+            else:
+                raise Exception('Should have run out of space.')
             try:
                 s.execute(func.oltree_free_path(root.path, '__FIRST__')).scalar_one()
             except sqlalchemy.exc.DataError as e:
                 s.rollback()
+            else:
+                raise Exception('Should have run out of space.')
             try:
                 s.execute(func.oltree_free_path(root.path, 'r.5000')).scalar_one()
             except sqlalchemy.exc.DataError as e:
                 s.rollback()
+            else:
+                raise Exception('Should have run out of space.')
 
-    def test_rebalance(self):
-        self.set_digits(4,2)
-        self.populate(1,3)
+
+    def test_rebalance_not_full(self):
+        '''
+        Should spread out ordinals which were originally sequential.
+        '''
+        self.set_digits(2,1)
+        # populate with sequential ordinals (0,1,2).
+        self.populate(1,3, path_chooser=path_chooser_sequential)
+        with Session(self.engine, future=True) as s:
+            # Rebalance.
+            s.execute(text("CALL oltree_rebalance(:path)"), {'path': 'r'})
+            s.commit()
+        self.assertEqual([str(o.path) for o in self.all_nodes()], ['r', 'r.25', 'r.50', 'r.75'])
+
+    def test_rebalance_full(self):
+        '''
+        Should result in a sqlalchemy.exc.DataError when rebalancing full branch.
+        '''
+        self.set_digits(2,1)
+        # Fill the tree and try to rebalance. Should result in an error.
+        self.populate(1,100, path_chooser=path_chooser_sequential)
+        with Session(self.engine, future=True) as s:
+            try:
+                s.execute(text("CALL oltree_rebalance(:path)"), {'path': 'r'})
+            except sqlalchemy.exc.DataError as e:
+                s.rollback()
+            else:
+                raise Exception('Should have run out of space.')
