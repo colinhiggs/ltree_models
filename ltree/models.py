@@ -13,7 +13,7 @@ __all__ = (
 
 class NodeBase:
     def __repr__(self):
-       return f"{self.__class__.__name__}(id={self.id!r}, name={self.name!r}, path={self.path!r})"
+       return f"{self.__class__.__name__}(id={self.id!r}, name={self.name!r}, path={self.path!r})"  # pylint: disable=no-member
 
 
 
