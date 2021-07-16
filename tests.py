@@ -1,5 +1,7 @@
 import ltree
 import os
+import psycopg2
+import sqlalchemy
 import testing.postgresql
 import unittest
 
@@ -140,11 +142,36 @@ class Debugging(DBBase):
 @unittest.skipIf(debugging, 'debugging')
 class DBFunctions(DBBase):
 
-    # def test_single_child_central(self):
-    #     self.populate(1,1)
-    #     with Session(engine, future=True) as s:
-    #         obj = s.execute(select(self.Node).where(func.nlevel(self.Node.path)==2)).scalar_one()
-    #     self.assertEqual(str(obj.path), 'r.5' + ('0' * (ltree.DEFAULT_MAX_DIGITS - 1)))
-
     def test_free_path(self):
-        self.populate(2,2)
+        self.set_digits(4,2)
+        self.populate(2,3)
+        with Session(self.engine, future=True) as s:
+            root = s.execute(
+                select(self.Node).where(self.Node.path==Ltree('r'))
+            ).scalar_one()
+            children = s.execute(
+                select(self.Node).where(func.nlevel(self.Node.path)==2)
+            ).scalars().all()
+            path_after = s.execute(func.oltree_free_path(root.path)).scalar_one()
+            self.assertEqual(path_after, Ltree('r.7600'))
+            path_before = s.execute(func.oltree_free_path(root.path, '__FIRST__')).scalar_one()
+            self.assertEqual(path_before, Ltree('r.2400'))
+            path_between = s.execute(func.oltree_free_path(root.path, 'r.5000')).scalar_one()
+            self.assertEqual(path_between, Ltree('r.6250'))
+            # Deliberately create nodes with no adjacent spaces.
+            s.add(self.Node(name='r.last', path=Ltree('r.9999')))
+            s.add(self.Node(name='r.first', path=Ltree('r.0000')))
+            s.add(self.Node(name='r.1_plus_1', path=Ltree('r.5001')))
+            s.commit()
+            try:
+                s.execute(func.oltree_free_path(root.path)).scalar_one()
+            except sqlalchemy.exc.DataError as e:
+                s.rollback()
+            try:
+                s.execute(func.oltree_free_path(root.path, '__FIRST__')).scalar_one()
+            except sqlalchemy.exc.DataError as e:
+                s.rollback()
+            try:
+                s.execute(func.oltree_free_path(root.path, 'r.5000')).scalar_one()
+            except sqlalchemy.exc.DataError as e:
+                s.rollback()
