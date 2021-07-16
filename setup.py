@@ -11,6 +11,7 @@ requires = [
 ]
 
 tests_require = [
+    'psycopg2',
     'testing.postgresql',
     'tox',
 ]
