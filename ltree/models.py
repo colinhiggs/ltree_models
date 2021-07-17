@@ -1,6 +1,7 @@
 from sqlalchemy_utils import LtreeType, Ltree
 
 from sqlalchemy import (
+    column,
     Column,
     Text,
     Index,
@@ -35,8 +36,18 @@ class OLtreeMixin:
     )
 
     @declared_attr
-    def parent(self):
+    def parent_path(self):
         return column_property(func.subpath(self.path, 0, -1))
+
+    # @declared_attr
+    # def previous(self):
+    #     return column_property(
+    #         select(
+    #             self.path
+    #         ).where(
+    #             self.path == self.path
+    #         ).order_by(self.path).limit(1)
+    #     )
 
     @classmethod
     def add_path_index(cls):

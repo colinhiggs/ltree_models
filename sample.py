@@ -67,7 +67,7 @@ ses.close()
 ses = Session(engine)
 q = ses.query(Node).order_by(Node.path.desc()).limit(10)
 for node in reversed(q.all()):
-    print(node, node.parent)
+    print(node, node.parent_path)
 ses.close()
 
 
