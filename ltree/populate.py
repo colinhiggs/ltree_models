@@ -19,7 +19,8 @@ __all__ = (
 
 class LtreeBuilder:
 
-    def __init__(self,
+    def __init__(
+        self,
         engine, node_class,
         max_digits=ltree.DEFAULT_MAX_DIGITS,
         step_digits=ltree.DEFAULT_STEP_DIGITS
@@ -28,7 +29,8 @@ class LtreeBuilder:
         self.Node = node_class
         self.set_digits(max_digits, step_digits)
 
-    def set_digits(self,
+    def set_digits(
+        self,
         max_digits=ltree.DEFAULT_MAX_DIGITS,
         step_digits=ltree.DEFAULT_STEP_DIGITS
     ):
@@ -77,10 +79,8 @@ class LtreeBuilder:
         step = round(((self.max_number + 1) / (n_children + 1)))
         return parent.path + Ltree(f'{(step * (i + 1)):0{self.max_digits}d}')
 
-
     def path_chooser_free_path_rebalance(self, parent, i, n_children):
         return func.oltree_free_path_rebalance(parent.path)
-
 
     def path_chooser_sequential(self, parent, i, n_children):
         return parent.path + Ltree(str(i))
