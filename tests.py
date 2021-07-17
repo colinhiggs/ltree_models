@@ -52,30 +52,12 @@ def _compile_drop_table(element, compiler, **kwargs):
     return compiler.visit_drop_table(element) + " CASCADE"
 
 
-def path_chooser_balanced(self, parent, i, n_children):
-    step = round(((self.max_number + 1) / (n_children + 1)))
-    return parent.path + Ltree(f'{(step * (i + 1)):0{self.max_digits}d}')
-
-
-def path_chooser_free_path_rebalance(self, parent, i, n_children):
-    return func.oltree_free_path_rebalance(parent.path)
-
-
-def path_chooser_sequential(self, parent, i, n_children):
-    return parent.path + Ltree(str(i))
-
-
-# class oltree_free_path_rebalance(GenericFunction):
-#     type = Ltree
-
-
 def setUpModule():
     '''Create a test DB and import data.'''
     # Create a new database somewhere in /tmp
     global db
     global engine
-    # global Base
-    # global Node
+
     db = testing.postgresql.Postgresql()
     engine = create_engine(db.url(), future=True)
     ltree.add_ltree_extension(engine)
@@ -93,61 +75,16 @@ class DBBase(unittest.TestCase):
     def setUp(self):
         global db
         global engine
-        # global Base
-        # global Node
         self.prefix = 'oltree'
         self.Node = Node
         self.engine = engine
         Base.metadata.create_all(engine)
-        self.set_digits()
-
-    def tearDown(self):
-        # global Base
-        # global engine
-        Base.metadata.drop_all(self.engine)
-
-    def set_digits(self,
-        max_digits=ltree.DEFAULT_MAX_DIGITS,
-        step_digits=ltree.DEFAULT_STEP_DIGITS
-        ):
-        self.max_digits = max_digits
-        self.max_number = 10 ** max_digits - 1
-        self.step_digits = step_digits
-        self.step_number = 10 ** step_digits
-        ltree.add_oltree_functions(
-            engine, max_digits=max_digits, step_digits=step_digits
+        self.tree_builder = ltree.LtreeBuilder(
+            engine, Node, max_digits=6, step_digits=3
         )
 
-    def recursive_add_children(
-        self, session,
-        parent, depth, n_children,
-        path_chooser=path_chooser_balanced
-        ):
-        if depth <= 0:
-            return
-        for i in range(n_children):
-            node = self.Node(
-                name=f'{parent.name}.{str(i)}',
-                path=path_chooser(self, parent, i, n_children)
-            )
-            session.add(node)
-            self.recursive_add_children(session, node, depth - 1, n_children, path_chooser=path_chooser)
-
-    def populate(self, depth, n_children, path_chooser=path_chooser_balanced):
-        with Session(self.engine, future=True) as s:
-            root = self.Node(name='r', path=Ltree('r'))
-            s.add(root)
-            self.recursive_add_children(s, root, depth, n_children, path_chooser)
-            s.commit()
-
-    def all_nodes(self):
-        with Session(self.engine, future=True) as s:
-            return s.execute(select(self.Node).order_by(self.Node.path)).scalars().all()
-
-    def print_tree(self):
-        with Session(self.engine, future=True) as s:
-            for o in self.all_nodes():
-                print(o)
+    def tearDown(self):
+        Base.metadata.drop_all(self.engine)
 
 
 @unittest.skipUnless(debugging, 'Not debugging')
@@ -165,8 +102,8 @@ class DBFunctions(DBBase):
         '''
         Should successfully find paths when there is space.
         '''
-        self.set_digits(4,2)
-        self.populate(1,3)
+        self.tree_builder.set_digits(4,2)
+        self.tree_builder.populate(1,3)
         with Session(self.engine, future=True) as s:
             root = s.execute(
                 select(self.Node).where(self.Node.path==Ltree('r'))
@@ -186,8 +123,8 @@ class DBFunctions(DBBase):
         '''
         Should fail to find paths when there is no space at the specified point.
         '''
-        self.set_digits(4,2)
-        self.populate(1,3)
+        self.tree_builder.set_digits(4,2)
+        self.tree_builder.populate(1,3)
         with Session(self.engine, future=True) as s:
             root = s.execute(
                 select(self.Node).where(self.Node.path==Ltree('r'))
@@ -221,22 +158,22 @@ class DBFunctions(DBBase):
         '''
         Should spread out ordinals which were originally sequential.
         '''
-        self.set_digits(2,1)
+        self.tree_builder.set_digits(2,1)
         # populate with sequential ordinals (0,1,2).
-        self.populate(1,3, path_chooser=path_chooser_sequential)
+        self.tree_builder.populate(1,3, path_chooser=self.tree_builder.path_chooser_sequential)
         with Session(self.engine, future=True) as s:
             # Rebalance.
             s.execute(text("CALL oltree_rebalance(:path)"), {'path': 'r'})
             s.commit()
-        self.assertEqual([str(o.path) for o in self.all_nodes()], ['r', 'r.25', 'r.50', 'r.75'])
+        self.assertEqual([str(o.path) for o in self.tree_builder.all_nodes()], ['r', 'r.25', 'r.50', 'r.75'])
 
     def test_rebalance_full(self):
         '''
         Should result in a sqlalchemy.exc.DataError when rebalancing full branch.
         '''
-        self.set_digits(2,1)
+        self.tree_builder.set_digits(2,1)
         # Fill the tree and try to rebalance. Should result in an error.
-        self.populate(1,100, path_chooser=path_chooser_sequential)
+        self.tree_builder.populate(1,100, path_chooser=self.tree_builder.path_chooser_sequential)
         with Session(self.engine, future=True) as s:
             try:
                 s.execute(text("CALL oltree_rebalance(:path)"), {'path': 'r'})
