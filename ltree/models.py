@@ -27,6 +27,7 @@ from sqlalchemy.orm import (
     object_session,
     relationship,
     remote,
+    Session,
 )
 from sqlalchemy.ext.hybrid import (
     hybrid_property,
@@ -73,6 +74,7 @@ class Common:
     def set_new_path(self, new_path):
         cls = self.__class__
         s = object_session(self)
+        # with Session(object_session(self).get_bind(), future=True) as s:
         s.execute(
             update(
                 cls
@@ -86,12 +88,14 @@ class Common:
                     ),
                     (
                         cls.path != self.path,
-                        new_path + func.subpath(cls.path, func.nlevel(self.path))
+                        # new_path + func.subpath(cls.path, func.nlevel(self.path))
+                        text(":new_path || subpath(path, nlevel(:current_path))")
                     )
                 )
             ).execution_options(
                 synchronize_session='fetch'
-            )
+            ),
+            params={'new_path': new_path, 'current_path': self.path}
         )
 
     def __repr__(self):
