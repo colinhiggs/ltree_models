@@ -31,25 +31,17 @@ from sqlalchemy.ext.hybrid import (
 )
 
 __all__ = (
+    'LtreeMixin',
     'OLtreeMixin',
 )
 
 
 @declarative_mixin
-class OLtreeMixin:
+class Common:
 
     @declared_attr
-    def __table_args__(cls):  # pylint: disable=no-self-argument
-        return (
-            Index(f'{cls.__tablename__}_path_idx', cls.path, postgresql_using='gist'),
-            UniqueConstraint('path', deferrable=True, initially='immediate'),
-        )
-
-    path = Column(LtreeType, nullable=False)
-
-    # @declared_attr
-    # def parent_path(cls): #  pylint: disable=no-self-argument
-    #     return column_property(func.subpath(cls.path, 0, -1))
+    def path(cls):
+        return Column(LtreeType, nullable=False)
 
     @hybrid_property
     def parent_path(self):
@@ -71,6 +63,54 @@ class OLtreeMixin:
             primaryjoin=lambda: remote(cls.path) == func.subpath(foreign(cls.path), 0, -1),
             backref='children',
             viewonly=True,
+        )
+
+    def set_new_path(self, new_path):
+        cls = self.__class__
+        s = object_session(self)
+        s.execute(
+            update(
+                cls
+            ).where(
+                cls.path.op('<@', is_comparison=True)(self.path)
+            ).values(
+                path=case(
+                    (
+                        cls.path == self.path,
+                        new_path
+                    ),
+                    (
+                        cls.path != self.path,
+                        new_path + func.subpath(cls.path, func.nlevel(self.path))
+                    )
+                )
+            ).execution_options(
+                synchronize_session='fetch'
+            )
+        )
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(id={self.id!r}, name={self.name!r}, path={self.path!r})"  # pylint: disable=no-member
+
+
+@declarative_mixin
+class LtreeMixin(Common):
+
+    @declared_attr
+    def __table_args__(cls):  # pylint: disable=no-self-argument
+        return (
+            UniqueConstraint('path', deferrable=True, initially='immediate'),
+        )
+
+
+@declarative_mixin
+class OLtreeMixin(Common):
+
+    @declared_attr
+    def __table_args__(cls):  # pylint: disable=no-self-argument
+        return (
+            Index(f'{cls.__tablename__}_path_idx', cls.path, postgresql_using='gist'),
+            UniqueConstraint('path', deferrable=True, initially='immediate'),
         )
 
     @declared_attr
@@ -142,56 +182,3 @@ class OLtreeMixin:
         return s.execute(
             select(cls2).join(pl, cls2.path == pl.c.lead).where(pl.c.path == self.path)
         ).scalar_one_or_none()
-
-    # @hybrid_property
-    # def relative_position(self):
-    #     return [
-    #         (self.parent and self.parent.path) or None,
-    #         (self.previous_sibling and self.previous_sibling.path) or None
-    #     ]
-    #
-    # @relative_position.setter
-    # def relative_position(self, value):
-    #     cls = self.__class__
-    #     (parent_path, previous_sibling_path) = (Ltree(v) for v in value)
-    #     s = object_session(self)
-    #     # Check that parent_path exists
-    #     try:
-    #         s.execute(
-    #             select(cls).where(cls.path == parent_path)
-    #         ).scalar_one()
-    #     except sqlalchemy.exc.NoResultFound as e:
-    #         raise ValueError(f'parent path "{parent_path}" does not exist.')
-    #     # if previous_sibling_path:
-    #     #
-    #     new_path = s.execute(
-    #         func.oltree_free_path_parent_sibling(parent_path, previous_sibling_path)
-    #     ).scalar_one()
-    #     self.set_new_path(new_path)
-
-    def set_new_path(self, new_path):
-        cls = self.__class__
-        s = object_session(self)
-        s.execute(
-            update(
-                cls
-            ).where(
-                cls.path.op('<@', is_comparison=True)(self.path)
-            ).values(
-                path=case(
-                    (
-                        cls.path == self.path,
-                        new_path
-                    ),
-                    (
-                        cls.path != self.path,
-                        new_path + func.subpath(cls.path, func.nlevel(self.path))
-                    )
-                )
-            ).execution_options(
-                synchronize_session='fetch'
-            )
-        )
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}(id={self.id!r}, name={self.name!r}, path={self.path!r})"  # pylint: disable=no-member
