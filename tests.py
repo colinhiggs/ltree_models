@@ -200,3 +200,101 @@ class DBFunctions(DBBase):
                 s.rollback()
             else:
                 raise Exception('Should have run out of space.')
+
+
+@unittest.skipIf(debugging, 'debugging')
+class OLtreeMixin(DBBase):
+    def test_parent_path(self):
+        # self.tree_builder.set_digits(4,2)
+        # self.tree_builder.populate(1,2)
+        with Session(self.engine, future=True) as s:
+            root = Node(name='r', path=Ltree('r'))
+            s.add(root)
+            child = Node(name='r.1', path=Ltree('r.50'))
+            grandchild = Node(name='r.1.1', path=Ltree('r.50.50'))
+            other = Node(name='r.2.1', path=Ltree('r.60.50'))
+            s.add(child)
+            s.add(grandchild)
+            s.add(other)
+            s.commit()
+            # print(child.parent_path, grandchild.parent_path, other.parent_path)
+            self.assertEqual(child.parent_path, 'r')
+            self.assertEqual(grandchild.parent_path, 'r.50')
+            self.assertEqual(other.parent_path, 'r.60')
+
+    def test_parent(self):
+        with Session(self.engine, future=True) as s:
+            root = Node(name='r', path=Ltree('r'))
+            s.add(root)
+            child = Node(name='r.1', path=Ltree('r.50'))
+            grandchild = Node(name='r.1.1', path=Ltree('r.50.50'))
+            other = Node(name='r.2.1', path=Ltree('r.60.50'))
+            s.add(child)
+            s.add(grandchild)
+            s.add(other)
+            s.commit()
+            # print(child.parent, grandchild.parent, other.parent)
+            self.assertEqual(child.parent.path, 'r')
+            self.assertEqual(grandchild.parent.path, 'r.50')
+            self.assertIs(other.parent, None)
+
+    def test_children(self):
+        with Session(self.engine, future=True) as s:
+            root = Node(name='r', path=Ltree('r'))
+            s.add(root)
+            child = Node(name='r.1', path=Ltree('r.50'))
+            child2 = Node(name='r.2', path=Ltree('r.70'))
+            grandchild = Node(name='r.1.1', path=Ltree('r.50.50'))
+            s.add(child)
+            s.add(child2)
+            s.add(grandchild)
+            s.commit()
+            self.assertEqual(
+                {child.path for child in root.children},
+                {'r.50', 'r.70'}
+            )
+
+    def test_previous_next_sibling(self):
+        self.tree_builder.set_digits(4,2)
+        self.tree_builder.populate(1,3)
+        with Session(self.engine, future=True) as s:
+            first = s.execute(select(Node).where(Node.path==Ltree('r.2500'))).scalar_one()
+            middle = s.execute(select(Node).where(Node.path==Ltree('r.5000'))).scalar_one()
+            last = s.execute(select(Node).where(Node.path==Ltree('r.7500'))).scalar_one()
+            self.assertIs(first.previous_sibling, None)
+            self.assertIs(middle.previous_sibling, first)
+            self.assertIs(middle.next_sibling, last)
+            self.assertIs(last.next_sibling, None)
+
+    def test_previous_sibling_path_getter(self):
+        self.tree_builder.set_digits(4,2)
+        self.tree_builder.populate(1,3)
+        with Session(self.engine, future=True) as s:
+            first = s.execute(select(Node).where(Node.path==Ltree('r.2500'))).scalar_one()
+            middle = s.execute(select(Node).where(Node.path==Ltree('r.5000'))).scalar_one()
+            last = s.execute(select(Node).where(Node.path==Ltree('r.7500'))).scalar_one()
+            self.assertIs(first.previous_sibling_path, None)
+            self.assertEqual(middle.previous_sibling_path, first.path)
+
+    def test_previous_sibling_path_setter(self):
+        self.tree_builder.set_digits(4,2)
+        self.tree_builder.populate(2,3)
+        with Session(self.engine, future=True) as s:
+            first = s.execute(select(Node).where(Node.path==Ltree('r.2500'))).scalar_one()
+            middle = s.execute(select(Node).where(Node.path==Ltree('r.5000'))).scalar_one()
+            last = s.execute(select(Node).where(Node.path==Ltree('r.7500'))).scalar_one()
+            # reorder with first now in the middle
+            first.previous_sibling_path = middle.path
+            self.assertIs(first.previous_sibling, middle)
+            self.assertIs(first.next_sibling, last)
+            s.rollback()
+            # reorder with middle now first
+            middle.previous_sibling_path = middle.parent.path + '__FIRST__'
+            self.assertIs(middle.previous_sibling, None)
+            self.assertIs(middle.next_sibling, first)
+            s.rollback()
+            # reorder with middle now last
+            middle.previous_sibling_path = middle.parent.path + '__LAST__'
+            self.assertIs(middle.previous_sibling, last)
+            self.assertIs(middle.next_sibling, None)
+            s.rollback()
