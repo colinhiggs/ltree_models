@@ -37,10 +37,15 @@ __all__ = (
 
 @declarative_mixin
 class OLtreeMixin:
+
+    @declared_attr
+    def __table_args__(cls):
+        return (
+            Index(f'{cls.__tablename__}_path_idx', cls.path, postgresql_using='gist'),
+            UniqueConstraint('path', deferrable=True, initially='immediate'),
+        )
+
     path = Column(LtreeType, nullable=False)
-    __table_args__ = (
-        UniqueConstraint('path', deferrable=True, initially='immediate'),
-    )
 
     # @declared_attr
     # def parent_path(cls): #  pylint: disable=no-self-argument

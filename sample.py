@@ -34,7 +34,7 @@ class Node(Base, ltree.OLtreeMixin):
     id = Column(id_type, primary_key=True)
     name = Column(Text, nullable=False)
 
-Index(f'{Node.__tablename__}_path_idx', Node.path, postgresql_using='gist')
+# Index(f'{Node.__tablename__}_path_idx', Node.path, postgresql_using='gist')
 
 db = testing.postgresql.Postgresql(
     base_dir='.',
