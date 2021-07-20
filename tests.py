@@ -121,7 +121,55 @@ class DBFunctions(DBBase):
 
     def test_noretry_free_path_full(self):
         '''
-        Should fail to find paths when there is no space at the specified point.
+        Should rebalance and find paths when there is no space at the specified point.
+        '''
+        self.tree_builder.set_digits(4,2)
+        self.tree_builder.populate(1,3)
+        with Session(self.engine, future=True) as s:
+            root = s.execute(
+                select(self.Node).where(self.Node.path==Ltree('r'))
+            ).scalar_one()
+            # Deliberately create nodes with no adjacent spaces.
+            s.add(self.Node(name='r.last', path=Ltree('r.9999')))
+            s.add(self.Node(name='r.first', path=Ltree('r.0000')))
+            s.add(self.Node(name='r.1_plus_1', path=Ltree('r.5001')))
+            s.commit()
+            path_after = s.execute(func.oltree_free_path(root.path + '__LAST__')).scalar_one()
+            path_before = s.execute(func.oltree_free_path(root.path + '__FIRST__')).scalar_one()
+            path_between = s.execute(func.oltree_free_path(root.path + '5000')).scalar_one()
+            # print(path_after, path_before, path_between)
+
+    def test_rebalance_not_full(self):
+        '''
+        Should spread out ordinals which were originally sequential.
+        '''
+        self.tree_builder.set_digits(2,1)
+        # populate with sequential ordinals (0,1,2).
+        self.tree_builder.populate(1,3, path_chooser=self.tree_builder.path_chooser_sequential)
+        with Session(self.engine, future=True) as s:
+            # Rebalance.
+            s.execute(text("CALL oltree_rebalance(:path)"), {'path': 'r'})
+            s.commit()
+        self.assertEqual([str(o.path) for o in self.tree_builder.all_nodes()], ['r', 'r.25', 'r.50', 'r.75'])
+
+    def test_rebalance_full(self):
+        '''
+        Should result in a sqlalchemy.exc.DataError when rebalancing full branch.
+        '''
+        self.tree_builder.set_digits(2,1)
+        # Fill the tree and try to rebalance. Should result in an error.
+        self.tree_builder.populate(1,100, path_chooser=self.tree_builder.path_chooser_sequential)
+        with Session(self.engine, future=True) as s:
+            try:
+                s.execute(text("CALL oltree_rebalance(:path)"), {'path': 'r'})
+            except sqlalchemy.exc.DataError as e:
+                s.rollback()
+            else:
+                raise Exception('Should have run out of space.')
+
+    def test_free_path_full(self):
+        '''
+        Should rebalance to find free spaces.
         '''
         self.tree_builder.set_digits(4,2)
         self.tree_builder.populate(1,3)
@@ -148,34 +196,6 @@ class DBFunctions(DBBase):
                 raise Exception('Should have run out of space.')
             try:
                 s.execute(func.oltree_noretry_free_path(root.path + '5000')).scalar_one()
-            except sqlalchemy.exc.DataError as e:
-                s.rollback()
-            else:
-                raise Exception('Should have run out of space.')
-
-    def test_rebalance_not_full(self):
-        '''
-        Should spread out ordinals which were originally sequential.
-        '''
-        self.tree_builder.set_digits(2,1)
-        # populate with sequential ordinals (0,1,2).
-        self.tree_builder.populate(1,3, path_chooser=self.tree_builder.path_chooser_sequential)
-        with Session(self.engine, future=True) as s:
-            # Rebalance.
-            s.execute(text("CALL oltree_rebalance(:path)"), {'path': 'r'})
-            s.commit()
-        self.assertEqual([str(o.path) for o in self.tree_builder.all_nodes()], ['r', 'r.25', 'r.50', 'r.75'])
-
-    def test_rebalance_full(self):
-        '''
-        Should result in a sqlalchemy.exc.DataError when rebalancing full branch.
-        '''
-        self.tree_builder.set_digits(2,1)
-        # Fill the tree and try to rebalance. Should result in an error.
-        self.tree_builder.populate(1,100, path_chooser=self.tree_builder.path_chooser_sequential)
-        with Session(self.engine, future=True) as s:
-            try:
-                s.execute(text("CALL oltree_rebalance(:path)"), {'path': 'r'})
             except sqlalchemy.exc.DataError as e:
                 s.rollback()
             else:
