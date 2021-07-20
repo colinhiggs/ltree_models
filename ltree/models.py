@@ -39,7 +39,7 @@ __all__ = (
 class OLtreeMixin:
 
     @declared_attr
-    def __table_args__(cls):
+    def __table_args__(cls):  # pylint: disable=no-self-argument
         return (
             Index(f'{cls.__tablename__}_path_idx', cls.path, postgresql_using='gist'),
             UniqueConstraint('path', deferrable=True, initially='immediate'),
@@ -125,7 +125,7 @@ class OLtreeMixin:
         previous_sibling_path = Ltree(value)
         s = object_session(self)
         new_path = s.execute(
-            func.oltree_free_path_after_rebalance(previous_sibling_path)
+            func.oltree_free_path(previous_sibling_path)
         ).scalar_one()
         self.set_new_path(new_path)
 
@@ -165,7 +165,7 @@ class OLtreeMixin:
     #     # if previous_sibling_path:
     #     #
     #     new_path = s.execute(
-    #         func.oltree_free_path_rebalance(parent_path, previous_sibling_path)
+    #         func.oltree_free_path_parent_sibling(parent_path, previous_sibling_path)
     #     ).scalar_one()
     #     self.set_new_path(new_path)
 
@@ -192,10 +192,6 @@ class OLtreeMixin:
                 synchronize_session='fetch'
             )
         )
-
-    @classmethod
-    def add_path_index(cls):
-        Index(f'{cls.__tablename__}_path_idx', cls.path, postgresql_using='gist')
 
     def __repr__(self):
         return f"{self.__class__.__name__}(id={self.id!r}, name={self.name!r}, path={self.path!r})"  # pylint: disable=no-member

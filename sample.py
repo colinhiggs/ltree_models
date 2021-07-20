@@ -55,6 +55,7 @@ Base.metadata.create_all(engine)
 # ltree.add_oltree_functions(engine, max_digits=16, step_digits=8)
 tree_builder = ltree.LtreeBuilder(engine, Node, max_digits=6, step_digits=3)
 
+# tree_builder.populate(2, 3, tree_builder.path_chooser_free_path)
 tree_builder.populate(2, 3)
 
 ses = Session(engine)
@@ -79,22 +80,11 @@ with Session(engine) as s:
     # ).all()
     # print(res)
     #
-    n2 = aliased(Node)
     item = s.execute(select(Node).where(Node.path==Ltree('r.500000'))).scalar_one()
-    pl = select(
-        Node.path, func.lag(Node.path).over(order_by=Node.path).label('lag')
-    ).filter(
-        func.subpath(Node.path, 0, -1) == func.subpath(item.path, 0, -1)
-    ).subquery()
-    res = s.execute(
-        select(n2, Node).join(pl, Node.path == pl.c.path).filter(n2.path == pl.c.lag).filter(
-            Node.path == item.path
-        )
-    ).scalars().all()
-    print(res)
+    print(item)
     print(item.previous_sibling.path, item.next_sibling.path, item.parent.path)
-    # item.relative_position=[item.next_sibling.path, 'r.750000.240000']
-    item.previous_sibling_path=item.next_sibling.path + '__LAST__'
+    item.relative_position=[item.next_sibling.path, 'r.750000.240000']
+    # item.previous_sibling_path=item.next_sibling.path + '__LAST__'
     s.commit()
     # n2 = aliased(Node)
     # res = s.execute(

@@ -46,13 +46,13 @@ def add_ltree_extension(engine):
         con.execute(text("CREATE EXTENSION IF NOT EXISTS ltree;"))
 
 
-def free_path_text(
+def noretry_free_path_parent_sibling_text(
     table_name=DEFAULT_TABLE_NAME,
     prefix=DEFAULT_PREFIX, postfix=DEFAULT_POSTFIX,
     max_digits=DEFAULT_MAX_DIGITS, step_digits=DEFAULT_STEP_DIGITS,
 ):
     table_name = wrap_name(table_name, prefix=prefix, postfix=postfix)
-    func_name = wrap_name('free_path', prefix=prefix, postfix=postfix)
+    func_name = wrap_name('noretry_free_path_parent_sibling', prefix=prefix, postfix=postfix)
     format_text = 'FM' + '0' * max_digits
     return text(f'''
 CREATE OR REPLACE FUNCTION public.{func_name}(parent ltree, after ltree DEFAULT NULL::ltree)
@@ -155,13 +155,13 @@ $function$
 ''')
 
 
-def free_path_after_text(
+def noretry_free_path_text(
     table_name=DEFAULT_TABLE_NAME,
     prefix=DEFAULT_PREFIX, postfix=DEFAULT_POSTFIX,
     max_digits=DEFAULT_MAX_DIGITS, step_digits=DEFAULT_STEP_DIGITS,
 ):
     table_name = wrap_name(table_name, prefix=prefix, postfix=postfix)
-    func_name = wrap_name('free_path_after', prefix=prefix, postfix=postfix)
+    func_name = wrap_name('noretry_free_path', prefix=prefix, postfix=postfix)
     format_text = 'FM' + '0' * max_digits
     return text(f'''
 CREATE OR REPLACE FUNCTION public.{func_name}(after ltree)
@@ -216,7 +216,7 @@ ELSE
     ORDER BY path
     LIMIT 1;
 END IF;
-RAISE NOTICE 'after: %, before: %', after, before;
+-- RAISE NOTICE 'after: %, before: %', after, before;
 IF after IS NOT NULL THEN
     after_pos := subpath(after, -1)::text::numeric;
 END IF;
@@ -293,7 +293,7 @@ n_children := COUNT(*) FROM {table_name}
     WHERE parent @> path and parent_level = nlevel(path) - 1;
 step := ((max_pos + 1) / (n_children + 1));
 RAISE NOTICE 'children % / %, step: %', n_children, (max_pos), step;
-IF step <= 1 THEN
+IF step <= 1.0::numeric THEN
     RAISE EXCEPTION 'out of space rebalancing %', parent
     USING ERRCODE = 'indicator_overflow';
 END IF;
@@ -316,15 +316,15 @@ $procedure$
 ''')
 
 
-def free_path_rebalance_text(
+def free_path_parent_sibling_text(
     table_name=DEFAULT_TABLE_NAME,
     prefix=DEFAULT_PREFIX, postfix=DEFAULT_POSTFIX,
     max_digits=DEFAULT_MAX_DIGITS, step_digits=DEFAULT_STEP_DIGITS,
 ):
     table_name = wrap_name(table_name, prefix=prefix, postfix=postfix)
-    func_name = wrap_name('free_path_rebalance', prefix=prefix, postfix=postfix)
+    func_name = wrap_name('free_path_parent_sibling', prefix=prefix, postfix=postfix)
     rebalance_name = wrap_name('rebalance', prefix=prefix, postfix=postfix)
-    free_path_name = wrap_name('free_path', prefix=prefix, postfix=postfix)
+    free_path_name = wrap_name('noretry_free_path_parent_sibling', prefix=prefix, postfix=postfix)
     format_text = 'FM' + '0' * max_digits
     return text(f'''
 CREATE OR REPLACE FUNCTION public.{func_name}(parent ltree, after ltree DEFAULT NULL::ltree)
@@ -343,15 +343,15 @@ $function$
 ''')
 
 
-def free_path_after_rebalance_text(
+def free_path_text(
     table_name=DEFAULT_TABLE_NAME,
     prefix=DEFAULT_PREFIX, postfix=DEFAULT_POSTFIX,
     max_digits=DEFAULT_MAX_DIGITS, step_digits=DEFAULT_STEP_DIGITS,
 ):
     table_name = wrap_name(table_name, prefix=prefix, postfix=postfix)
-    func_name = wrap_name('free_path_after_rebalance', prefix=prefix, postfix=postfix)
+    func_name = wrap_name('free_path', prefix=prefix, postfix=postfix)
     rebalance_name = wrap_name('rebalance', prefix=prefix, postfix=postfix)
-    free_path_name = wrap_name('free_path_after', prefix=prefix, postfix=postfix)
+    free_path_name = wrap_name('noretry_free_path', prefix=prefix, postfix=postfix)
     format_text = 'FM' + '0' * max_digits
     return text(f'''
 CREATE OR REPLACE FUNCTION public.{func_name}(after ltree)
@@ -362,9 +362,9 @@ BEGIN
 RETURN {free_path_name}(after);
 EXCEPTION
     WHEN indicator_overflow THEN
-        RAISE NOTICE 'rebalancing %', parent;
-        CALL {rebalance_name}(parent);
-        RETURN {free_path_name}(parent, after);
+        RAISE NOTICE 'rebalancing %', subpath(after, 0, -1);
+        CALL {rebalance_name}(subpath(after, 0, -1));
+        RETURN {free_path_name}(after);
 END;
 $function$
 ''')
@@ -377,11 +377,11 @@ def add_oltree_functions(
     max_digits=DEFAULT_MAX_DIGITS, step_digits=DEFAULT_STEP_DIGITS,
 ):
     fnames = (
-        'free_path',
-        'free_path_after',
         'rebalance',
-        'free_path_rebalance',
-        'free_path_after_rebalance',
+        'noretry_free_path',
+        'free_path',
+        'noretry_free_path_parent_sibling',
+        'free_path_parent_sibling',
     )
 
     for fname in fnames:

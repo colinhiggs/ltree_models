@@ -1,3 +1,4 @@
+import logging
 import ltree
 import os
 import psycopg2
@@ -9,7 +10,6 @@ from sqlalchemy import (
     create_engine,
     Column,
     engine,
-    Index,
     Integer,
     text,
     Text,
@@ -30,6 +30,8 @@ from sqlalchemy.schema import DropTable
 from sqlalchemy.sql.functions import GenericFunction
 
 debugging = os.environ.get('DEBUGGING')
+# logging.basicConfig()   # log messages to stdout
+# logging.getLogger('sqlalchemy.dialects.postgresql').setLevel(logging.INFO)
 
 # Required to be able to use ltree objects directly in queries and functions.
 # See https://github.com/kvesteri/sqlalchemy-utils/issues/430
@@ -44,7 +46,6 @@ class Node(Base, ltree.OLtreeMixin):
     __tablename__ = 'oltree_nodes'
     id = Column(id_type, primary_key=True)
     name = Column(Text, nullable=False)
-Node.add_path_index()
 
 # drops tables with cascade
 @compiles(DropTable, "postgresql")
@@ -98,7 +99,7 @@ class Debugging(DBBase):
 @unittest.skipIf(debugging, 'debugging')
 class DBFunctions(DBBase):
 
-    def test_free_path_not_full(self):
+    def test_noretry_free_path_not_full(self):
         '''
         Should successfully find paths when there is space.
         '''
@@ -111,15 +112,14 @@ class DBFunctions(DBBase):
             children = s.execute(
                 select(self.Node).where(func.nlevel(self.Node.path)==2)
             ).scalars().all()
-            path_after = s.execute(func.oltree_free_path(root.path)).scalar_one()
+            path_after = s.execute(func.oltree_noretry_free_path(root.path + '__LAST__')).scalar_one()
             self.assertEqual(path_after, Ltree('r.7600'))
-            path_before = s.execute(func.oltree_free_path(root.path, '__FIRST__')).scalar_one()
+            path_before = s.execute(func.oltree_noretry_free_path(root.path + '__FIRST__')).scalar_one()
             self.assertEqual(path_before, Ltree('r.2400'))
-            path_between = s.execute(func.oltree_free_path(root.path, 'r.5000')).scalar_one()
+            path_between = s.execute(func.oltree_noretry_free_path(root.path + '5000')).scalar_one()
             self.assertEqual(path_between, Ltree('r.6250'))
 
-
-    def test_free_path_full(self):
+    def test_noretry_free_path_full(self):
         '''
         Should fail to find paths when there is no space at the specified point.
         '''
@@ -135,24 +135,23 @@ class DBFunctions(DBBase):
             s.add(self.Node(name='r.1_plus_1', path=Ltree('r.5001')))
             s.commit()
             try:
-                s.execute(func.oltree_free_path(root.path)).scalar_one()
+                s.execute(func.oltree_noretry_free_path(root.path + '__LAST__')).scalar_one()
             except sqlalchemy.exc.DataError as e:
                 s.rollback()
             else:
                 raise Exception('Should have run out of space.')
             try:
-                s.execute(func.oltree_free_path(root.path, '__FIRST__')).scalar_one()
+                s.execute(func.oltree_noretry_free_path(root.path + '__FIRST__')).scalar_one()
             except sqlalchemy.exc.DataError as e:
                 s.rollback()
             else:
                 raise Exception('Should have run out of space.')
             try:
-                s.execute(func.oltree_free_path(root.path, 'r.5000')).scalar_one()
+                s.execute(func.oltree_noretry_free_path(root.path + '5000')).scalar_one()
             except sqlalchemy.exc.DataError as e:
                 s.rollback()
             else:
                 raise Exception('Should have run out of space.')
-
 
     def test_rebalance_not_full(self):
         '''

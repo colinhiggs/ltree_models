@@ -56,6 +56,7 @@ class LtreeBuilder:
                 path=path_chooser(parent, i, n_children)
             )
             session.add(node)
+            session.commit()
             self.recursive_add_children(session, node, depth - 1, n_children, path_chooser=path_chooser)
 
     def populate(self, depth, n_children, path_chooser=None):
@@ -78,8 +79,8 @@ class LtreeBuilder:
         step = round(((self.max_number + 1) / (n_children + 1)))
         return parent.path + Ltree(f'{(step * (i + 1)):0{self.max_digits}d}')
 
-    def path_chooser_free_path_rebalance(self, parent, i, n_children):
-        return func.oltree_free_path_rebalance(parent.path)
+    def path_chooser_free_path(self, parent, i, n_children):
+        return func.oltree_free_path(parent.path + '__LAST__')
 
     def path_chooser_sequential(self, parent, i, n_children):
         return parent.path + Ltree(str(i))
