@@ -10,11 +10,13 @@ from sqlalchemy import (
     Index,
     create_engine,
     text,
+    and_,
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import (
     Query as BaseQuery,
-    Session
+    Session,
+    aliased,
 )
 from sqlalchemy.sql import (
     select,
@@ -58,9 +60,49 @@ tree_builder.populate(2, 3)
 ses = Session(engine)
 q = ses.query(Node).order_by(Node.path.desc()).limit(10)
 for node in reversed(q.all()):
-    print(node, node.parent_path)
+    print(node, [str(n.path) for n in node.ancestors], node.parent_path)
 ses.close()
 
+with Session(engine) as s:
+    engine.echo=True
+    for node in s.execute(select(Node).where(Node.parent_path==Ltree('r'))).scalars().all():
+        print(node)
+
+    # print('*************************************************************')
+    # pathlag = select(
+    #     Node.path, func.lag(Node.path).over(order_by=Node.path).label('lag')
+    # ).filter(
+    #     func.subpath(Node.path, 0, -1) == 'r'
+    # ).subquery()
+    # res = s.execute(
+    #     select(pathlag).filter(pathlag.c.path == Ltree('r.500000'))
+    # ).all()
+    # print(res)
+    #
+    n2 = aliased(Node)
+    item = s.execute(select(Node).where(Node.path==Ltree('r.500000'))).scalar_one()
+    pl = select(
+        Node.path, func.lag(Node.path).over(order_by=Node.path).label('lag')
+    ).filter(
+        func.subpath(Node.path, 0, -1) == func.subpath(item.path, 0, -1)
+    ).subquery()
+    res = s.execute(
+        select(n2, Node).join(pl, Node.path == pl.c.path).filter(n2.path == pl.c.lag).filter(
+            Node.path == item.path
+        )
+    ).scalars().all()
+    print(res)
+    print(item.previous_sibling.path, item.next_sibling.path, item.parent.path)
+    # item.relative_position=[item.next_sibling.path, 'r.750000.240000']
+    item.previous_sibling_path=item.next_sibling.path + '__LAST__'
+    s.commit()
+    # n2 = aliased(Node)
+    # res = s.execute(
+    #     select(Node).filter(Node.previous_sibling == item)
+    # ).all()
+    # print(res)
+
+tree_builder.print_tree()
 
 print(db.url())
 input('enter to quit...')

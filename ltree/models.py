@@ -1,6 +1,10 @@
-from sqlalchemy_utils import LtreeType, Ltree
+import sqlalchemy
 
+from sqlalchemy_utils import LtreeType, Ltree
 from sqlalchemy import (
+    and_,
+    bindparam,
+    case,
     column,
     Column,
     Text,
@@ -8,10 +12,19 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
     select,
+    text,
+    type_coerce,
+    update,
 )
 from sqlalchemy.orm import (
+    aliased,
     column_property,
+    declarative_mixin,
     declared_attr,
+    foreign,
+    object_session,
+    relationship,
+    remote,
 )
 from sqlalchemy.ext.hybrid import (
     hybrid_property,
@@ -22,32 +35,158 @@ __all__ = (
 )
 
 
-# class PathIndexer(type):
-#     def __init__(cls, name, bases, clsdict):
-#         super(PathIndexer, cls).__init__(name, bases, clsdict)
-#         print("adding index")
-#         cls.add_path_index()
-
-
+@declarative_mixin
 class OLtreeMixin:
     path = Column(LtreeType, nullable=False)
     __table_args__ = (
         UniqueConstraint('path', deferrable=True, initially='immediate'),
     )
 
-    @declared_attr
-    def parent_path(self):
-        return column_property(func.subpath(self.path, 0, -1))
-
     # @declared_attr
-    # def previous(self):
-    #     return column_property(
-    #         select(
-    #             self.path
-    #         ).where(
-    #             self.path == self.path
-    #         ).order_by(self.path).limit(1)
+    # def parent_path(cls): #  pylint: disable=no-self-argument
+    #     return column_property(func.subpath(cls.path, 0, -1))
+
+    @hybrid_property
+    def parent_path(self):
+        return Ltree('.'.join(str(self.path).split('.')[:-1]))
+        # Or, if we wanted to get the database to do this for absolute
+        # consistency:
+        #
+        # s = object_session(self)
+        # return s.execute(select(func.subpath(self.path, 0, -1))).scalar_one()
+
+    @parent_path.expression
+    def parent_path(cls):
+        return func.subpath(cls.path, 0, -1)
+
+    @declared_attr
+    def parent(cls):
+        return relationship(
+            cls,
+            primaryjoin=lambda: remote(cls.path) == func.subpath(foreign(cls.path), 0, -1),
+            backref='children',
+            viewonly=True,
+        )
+
+    @declared_attr
+    def ancestors(cls):
+        return relationship(
+            cls,
+            primaryjoin=lambda: and_(
+                remote(cls.path).op('@>', is_comparison=True)(foreign(cls.path)),
+                func.nlevel(remote(cls.path)) < func.nlevel(foreign(cls.path))
+            ),
+            order_by=lambda: cls.path,
+            uselist=True,
+            viewonly=True
+        )
+
+    @hybrid_property
+    def previous_sibling(self):
+        cls = self.__class__
+        cls2 = aliased(cls)
+        s = object_session(self)
+        pl = select(
+            cls.path, func.lag(cls.path).over(order_by=cls.path).label('lag')
+        ).where(
+            func.subpath(cls.path, 0, -1) == func.subpath(self.path, 0, -1)
+        ).subquery()
+        return s.execute(
+            select(cls2).join(pl, cls2.path == pl.c.lag).where(pl.c.path == self.path)
+        ).scalar_one_or_none()
+
+    # @previous_sibling.expression
+    # def previous_sibling(cls):
+    #     cls2 = aliased(cls)
+    #     cls_tmp = aliased(cls)
+    #     pl = select(
+    #         cls_tmp.path, func.lag(cls_tmp.path).over(order_by=cls_tmp.path).label('lag')
+    #     ).where(
+    #         func.subpath(cls_tmp.path, 0, -1) == func.subpath(cls.path, 0, -1)
+    #         # True
+    #     ).subquery()
+    #     return (
+    #         select(cls2).join(pl, cls2.path == pl.c.lag).where(pl.c.path == cls.path)
     #     )
+
+    @hybrid_property
+    def previous_sibling_path(self):
+        prev = self.previous_sibling
+        return prev.path if prev else None  # pylint: disable=no-member
+
+    @previous_sibling_path.setter
+    def previous_sibling_path(self, value):
+        cls = self.__class__
+        previous_sibling_path = Ltree(value)
+        s = object_session(self)
+        new_path = s.execute(
+            func.oltree_free_path_after_rebalance(previous_sibling_path)
+        ).scalar_one()
+        self.set_new_path(new_path)
+
+    @hybrid_property
+    def next_sibling(self):
+        cls = self.__class__
+        cls2 = aliased(cls)
+        s = object_session(self)
+        pl = select(
+            cls.path, func.lead(cls.path).over(order_by=cls.path).label('lead')
+        ).where(
+            func.subpath(cls.path, 0, -1) == func.subpath(self.path, 0, -1)
+        ).subquery()
+        return s.execute(
+            select(cls2).join(pl, cls2.path == pl.c.lead).where(pl.c.path == self.path)
+        ).scalar_one_or_none()
+
+    # @hybrid_property
+    # def relative_position(self):
+    #     return [
+    #         (self.parent and self.parent.path) or None,
+    #         (self.previous_sibling and self.previous_sibling.path) or None
+    #     ]
+    #
+    # @relative_position.setter
+    # def relative_position(self, value):
+    #     cls = self.__class__
+    #     (parent_path, previous_sibling_path) = (Ltree(v) for v in value)
+    #     s = object_session(self)
+    #     # Check that parent_path exists
+    #     try:
+    #         s.execute(
+    #             select(cls).where(cls.path == parent_path)
+    #         ).scalar_one()
+    #     except sqlalchemy.exc.NoResultFound as e:
+    #         raise ValueError(f'parent path "{parent_path}" does not exist.')
+    #     # if previous_sibling_path:
+    #     #
+    #     new_path = s.execute(
+    #         func.oltree_free_path_rebalance(parent_path, previous_sibling_path)
+    #     ).scalar_one()
+    #     self.set_new_path(new_path)
+
+    def set_new_path(self, new_path):
+        cls = self.__class__
+        s = object_session(self)
+        s.execute(
+            update(
+                cls
+            ).where(
+                cls.path.op('<@', is_comparison=True)(self.path)
+            ).values(
+                path=case(
+                    (
+                        cls.path == self.path,
+                        new_path
+                    ),
+                    (
+                        cls.path != self.path,
+                        new_path + func.subpath(cls.path, func.nlevel(self.path))
+                    )
+                )
+            ).execution_options(
+                synchronize_session='fetch'
+            )
+        )
 
     @classmethod
     def add_path_index(cls):
