@@ -34,6 +34,12 @@ class Node(Base, ltree.OLtreeMixin):
     id = Column(id_type, primary_key=True)
     name = Column(Text, nullable=False)
 
+class LNode(Base, ltree.LtreeMixin):
+    __tablename__ = 'ltree_nodes'
+    id = Column(id_type, primary_key=True)
+    name = Column(Text, nullable=False)
+
+
 # Index(f'{Node.__tablename__}_path_idx', Node.path, postgresql_using='gist')
 
 db = testing.postgresql.Postgresql(
@@ -83,8 +89,8 @@ with Session(engine) as s:
     item = s.execute(select(Node).where(Node.path==Ltree('r.500000'))).scalar_one()
     print(item)
     print(item.previous_sibling.path, item.next_sibling.path, item.parent.path)
-    item.relative_position=[item.next_sibling.path, 'r.750000.240000']
-    # item.previous_sibling_path=item.next_sibling.path + '__LAST__'
+    # item.relative_position=[item.next_sibling.path, 'r.750000.240000']
+    item.previous_sibling_path=item.next_sibling.path + '__LAST__'
     s.commit()
     # n2 = aliased(Node)
     # res = s.execute(
@@ -93,6 +99,23 @@ with Session(engine) as s:
     # print(res)
 
 tree_builder.print_tree()
+
+with Session(engine, future=True) as s:
+    lroot = LNode(name='r', path=Ltree('r'))
+    c1 = LNode(name='r.1', path=lroot.path + Ltree('test'))
+    c2 = LNode(name='r.2')
+    s.add(lroot)
+    s.add(c1)
+    s.add(c2)
+    s.commit()
+    res = s.execute(select(LNode).order_by(LNode.path)).scalars().all()
+    for node in res:
+        print(node.name, node.path)
+    c2.parent_path = lroot.path
+    s.commit()
+    res = s.execute(select(LNode).order_by(LNode.path)).scalars().all()
+    for node in res:
+        print(node.name, node.path)
 
 print(db.url())
 input('enter to quit...')
