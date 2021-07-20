@@ -3,6 +3,7 @@ import sqlalchemy
 from sqlalchemy_utils import LtreeType, Ltree
 from sqlalchemy import (
     and_,
+    BigInteger,
     bindparam,
     case,
     column,
@@ -12,6 +13,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
     select,
+    Sequence,
     text,
     type_coerce,
     update,
@@ -39,9 +41,12 @@ __all__ = (
 @declarative_mixin
 class Common:
 
+    _path_id = Column(BigInteger, Sequence('path_id_seq'))
+
     @declared_attr
     def path(cls):
-        return Column(LtreeType, nullable=False)
+        # seq = Sequence('path_id_seq')
+        return Column(LtreeType, nullable=False, server_default=text("'newborn'::ltree || nextval('path_id_seq')::text::ltree"))
 
     @hybrid_property
     def parent_path(self):
