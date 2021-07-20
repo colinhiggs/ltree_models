@@ -67,12 +67,15 @@ class LtreeBuilder:
             self.recursive_add_children(s, root, depth, n_children, path_chooser)
             s.commit()
 
-    def all_nodes(self):
+    def all_nodes(self, session=None):
+        query = select(self.Node).order_by(self.Node.path)
+        if session:
+            return session.execute(query).scalars().all()
         with Session(self.engine, future=True) as s:
-            return s.execute(select(self.Node).order_by(self.Node.path)).scalars().all()
+            return s.execute(query).scalars().all()
 
-    def print_tree(self):
-        for o in self.all_nodes():
+    def print_tree(self, session=None):
+        for o in self.all_nodes(session=session):
             print(o)
 
     def path_chooser_balanced(self, parent, i, n_children):
