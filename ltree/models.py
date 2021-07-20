@@ -111,6 +111,12 @@ class LtreeMixin(Common):
             UniqueConstraint('path', deferrable=True, initially='immediate'),
         )
 
+    @Common.parent_path.setter
+    def parent_path(self, value):
+        val = Ltree(value)
+        _id = Ltree(str(self.id))
+        new_path = val + _id
+        self.set_new_path(new_path)
 
 @declarative_mixin
 class OLtreeMixin(Common):
