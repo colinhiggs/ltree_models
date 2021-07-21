@@ -49,6 +49,11 @@ class Common:
 
     _path_id = Column(BigInteger, Sequence('path_id_seq'))
 
+    @staticmethod
+    def next_path_id(session):
+        seq = Sequence('path_id_seq')
+        return session.execute(seq.next_value()).scalar_one()
+
     @declared_attr
     def path(cls):
         # seq = Sequence('path_id_seq')
