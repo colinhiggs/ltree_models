@@ -8,6 +8,7 @@ from sqlalchemy_utils import LtreeType, Ltree
 from sqlalchemy import (
     Column, Integer, String, Text,
     Index,
+    Sequence,
     create_engine,
     text,
     and_,
@@ -101,8 +102,9 @@ with Session(engine) as s:
 tree_builder.print_tree()
 
 with Session(engine, future=True) as s:
+    seq = Sequence('path_id_seq')
     lroot = LNode(name='r', path=Ltree('r'))
-    c1 = LNode(name='r.1', path=lroot.path + Ltree('test'))
+    c1 = LNode(name='r.1', path=lroot.path + Ltree(str(LNode.next_path_id(s))))
     c2 = LNode(name='r.2')
     s.add(lroot)
     s.add(c1)
@@ -112,6 +114,7 @@ with Session(engine, future=True) as s:
     for node in res:
         print(node.name, node.path)
     c2.parent_path = lroot.path
+    c1.parent_path = c2.path
     s.commit()
     res = s.execute(select(LNode).order_by(LNode.path)).scalars().all()
     for node in res:
