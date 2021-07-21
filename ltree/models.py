@@ -39,6 +39,11 @@ __all__ = (
 )
 
 
+def subpath(path, offset, length=None):
+    path = str(path)
+    return Ltree('.'.join(path.split('.')[offset:length]))
+
+
 @declarative_mixin
 class Common:
 
@@ -113,10 +118,7 @@ class LtreeMixin(Common):
 
     @Common.parent_path.setter
     def parent_path(self, value):
-        val = Ltree(value)
-        _id = Ltree(str(self.id))
-        new_path = val + _id
-        self.set_new_path(new_path)
+        self.set_new_path(Ltree(value) + subpath(self.path, -1))
 
 @declarative_mixin
 class OLtreeMixin(Common):
