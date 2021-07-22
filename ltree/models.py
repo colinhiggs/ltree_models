@@ -55,7 +55,7 @@ class Common:
         return session.execute(seq.next_value()).scalar_one()
 
     @declared_attr
-    def path(cls):
+    def path(cls):  # pylint: disable=no-self-argument
         # seq = Sequence('path_id_seq')
         return Column(LtreeType, nullable=False, server_default=text("'newborn'::ltree || nextval('path_id_seq')::text::ltree"))
 
@@ -69,15 +69,15 @@ class Common:
         # return s.execute(select(func.subpath(self.path, 0, -1))).scalar_one()
 
     @parent_path.expression
-    def parent_path(cls):
+    def parent_path(cls):  # pylint: disable=no-self-argument
         return func.subpath(cls.path, 0, -1)
 
     @declared_attr
-    def node_name(cls):
+    def node_name(cls):  # pylint: disable=no-self-argument
         return Column(Text, nullable=False)
 
     @declared_attr
-    def parent(cls):
+    def parent(cls):  # pylint: disable=no-self-argument
         return relationship(
             cls,
             primaryjoin=lambda: remote(cls.path) == func.subpath(foreign(cls.path), 0, -1),
@@ -125,9 +125,10 @@ class LtreeMixin(Common):
             UniqueConstraint('path', deferrable=True, initially='immediate'),
         )
 
-    @Common.parent_path.setter
+    @Common.parent_path.setter  # pylint: disable=no-member
     def parent_path(self, value):
         self.set_new_path(Ltree(value) + subpath(self.path, -1))
+
 
 @declarative_mixin
 class OLtreeMixin(Common):
@@ -140,7 +141,7 @@ class OLtreeMixin(Common):
         )
 
     @declared_attr
-    def ancestors(cls):
+    def ancestors(cls):  # pylint: disable=no-self-argument
         return relationship(
             cls,
             primaryjoin=lambda: and_(
