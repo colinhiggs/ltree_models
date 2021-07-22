@@ -87,7 +87,7 @@ class Common:
     def name_path(self):
         name_list = [node.node_name for node in self.ancestors]
         name_list.append(self.node_name)
-        return  self.name_path_sep.join(name_list)
+        return self.name_path_sep.join(name_list)
 
     @declared_attr
     def parent(cls):  # pylint: disable=no-self-argument
