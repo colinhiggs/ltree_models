@@ -74,9 +74,12 @@ class LtreeBuilder:
         with Session(self.engine, future=True) as s:
             return s.execute(query).scalars().all()
 
-    def print_tree(self, session=None):
+    def print_tree(self, session=None, with_name_path=False):
         for o in self.all_nodes(session=session):
-            print(o)
+            if with_name_path:
+                print(o, o.name_path)
+            else:
+                print(o)
 
     def path_chooser_balanced(self, parent, i, n_children):
         step = round(((self.max_number + 1) / (n_children + 1)))
