@@ -57,7 +57,12 @@ class Common:
     @declared_attr
     def path(cls):  # pylint: disable=no-self-argument
         # seq = Sequence('path_id_seq')
-        return Column(LtreeType, nullable=False, server_default=text("'newborn'::ltree || nextval('path_id_seq')::text::ltree"))
+        return Column(
+            LtreeType, nullable=False,
+            server_default=text(
+                "'newborn'::ltree || nextval('path_id_seq')::text::ltree"
+            )
+        )
 
     @hybrid_property
     def parent_path(self):
