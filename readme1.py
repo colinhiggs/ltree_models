@@ -17,12 +17,10 @@ Base = declarative_base()
 class UnorderedNode(Base, ltree.LtreeMixin):
     __tablename__ = 'ltree_nodes'
     id = Column(Integer, primary_key=True)
-    name = Column(Text, nullable=False)
 
 class OrderedNode(Base, ltree.OLtreeMixin):
     __tablename__ = 'oltree_nodes'
     id = Column(Integer, primary_key=True)
-    name = Column(Text, nullable=False)
 
 # Create a new postgresql database in /tmp
 db = testing.postgresql.Postgresql()
