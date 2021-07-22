@@ -33,12 +33,10 @@ id_type = Integer
 class Node(Base, ltree.OLtreeMixin):
     __tablename__ = 'oltree_nodes'
     id = Column(id_type, primary_key=True)
-    name = Column(Text, nullable=False)
 
 class LNode(Base, ltree.LtreeMixin):
     __tablename__ = 'ltree_nodes'
     id = Column(id_type, primary_key=True)
-    name = Column(Text, nullable=False)
 
 
 # Index(f'{Node.__tablename__}_path_idx', Node.path, postgresql_using='gist')
@@ -103,22 +101,22 @@ tree_builder.print_tree()
 
 with Session(engine, future=True) as s:
     seq = Sequence('path_id_seq')
-    lroot = LNode(name='r', path=Ltree('r'))
-    c1 = LNode(name='r.1', path=lroot.path + Ltree(str(LNode.next_path_id(s))))
-    c2 = LNode(name='r.2')
+    lroot = LNode(node_name='r', path=Ltree('r'))
+    c1 = LNode(node_name='r.1', path=lroot.path + Ltree(str(LNode.next_path_id(s))))
+    c2 = LNode(node_name='r.2')
     s.add(lroot)
     s.add(c1)
     s.add(c2)
     s.commit()
     res = s.execute(select(LNode).order_by(LNode.path)).scalars().all()
     for node in res:
-        print(node.name, node.path)
+        print(node.node_name, node.path)
     c2.parent_path = lroot.path
     c1.parent_path = c2.path
     s.commit()
     res = s.execute(select(LNode).order_by(LNode.path)).scalars().all()
     for node in res:
-        print(node.name, node.path)
+        print(node.node_name, node.path)
 
 print(db.url())
 input('enter to quit...')

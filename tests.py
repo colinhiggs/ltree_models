@@ -45,7 +45,6 @@ Base = declarative_base()
 class Node(Base, ltree.OLtreeMixin):
     __tablename__ = 'oltree_nodes'
     id = Column(id_type, primary_key=True)
-    name = Column(Text, nullable=False)
 
 # drops tables with cascade
 @compiles(DropTable, "postgresql")
@@ -130,9 +129,9 @@ class DBFunctions(DBBase):
                 select(self.Node).where(self.Node.path==Ltree('r'))
             ).scalar_one()
             # Deliberately create nodes with no adjacent spaces.
-            s.add(self.Node(name='r.last', path=Ltree('r.9999')))
-            s.add(self.Node(name='r.first', path=Ltree('r.0000')))
-            s.add(self.Node(name='r.1_plus_1', path=Ltree('r.5001')))
+            s.add(self.Node(node_name='r.last', path=Ltree('r.9999')))
+            s.add(self.Node(node_name='r.first', path=Ltree('r.0000')))
+            s.add(self.Node(node_name='r.1_plus_1', path=Ltree('r.5001')))
             s.commit()
             path_after = s.execute(func.oltree_free_path(root.path + '__LAST__')).scalar_one()
             path_before = s.execute(func.oltree_free_path(root.path + '__FIRST__')).scalar_one()
@@ -178,9 +177,9 @@ class DBFunctions(DBBase):
                 select(self.Node).where(self.Node.path==Ltree('r'))
             ).scalar_one()
             # Deliberately create nodes with no adjacent spaces.
-            s.add(self.Node(name='r.last', path=Ltree('r.9999')))
-            s.add(self.Node(name='r.first', path=Ltree('r.0000')))
-            s.add(self.Node(name='r.1_plus_1', path=Ltree('r.5001')))
+            s.add(self.Node(node_name='r.last', path=Ltree('r.9999')))
+            s.add(self.Node(node_name='r.first', path=Ltree('r.0000')))
+            s.add(self.Node(node_name='r.1_plus_1', path=Ltree('r.5001')))
             s.commit()
             try:
                 s.execute(func.oltree_noretry_free_path(root.path + '__LAST__')).scalar_one()
@@ -208,11 +207,11 @@ class OLtreeMixin(DBBase):
         # self.tree_builder.set_digits(4,2)
         # self.tree_builder.populate(1,2)
         with Session(self.engine, future=True) as s:
-            root = Node(name='r', path=Ltree('r'))
+            root = Node(node_name='r', path=Ltree('r'))
             s.add(root)
-            child = Node(name='r.1', path=Ltree('r.50'))
-            grandchild = Node(name='r.1.1', path=Ltree('r.50.50'))
-            other = Node(name='r.2.1', path=Ltree('r.60.50'))
+            child = Node(node_name='r.1', path=Ltree('r.50'))
+            grandchild = Node(node_name='r.1.1', path=Ltree('r.50.50'))
+            other = Node(node_name='r.2.1', path=Ltree('r.60.50'))
             s.add(child)
             s.add(grandchild)
             s.add(other)
@@ -224,11 +223,11 @@ class OLtreeMixin(DBBase):
 
     def test_parent(self):
         with Session(self.engine, future=True) as s:
-            root = Node(name='r', path=Ltree('r'))
+            root = Node(node_name='r', path=Ltree('r'))
             s.add(root)
-            child = Node(name='r.1', path=Ltree('r.50'))
-            grandchild = Node(name='r.1.1', path=Ltree('r.50.50'))
-            other = Node(name='r.2.1', path=Ltree('r.60.50'))
+            child = Node(node_name='r.1', path=Ltree('r.50'))
+            grandchild = Node(node_name='r.1.1', path=Ltree('r.50.50'))
+            other = Node(node_name='r.2.1', path=Ltree('r.60.50'))
             s.add(child)
             s.add(grandchild)
             s.add(other)
@@ -240,11 +239,11 @@ class OLtreeMixin(DBBase):
 
     def test_children(self):
         with Session(self.engine, future=True) as s:
-            root = Node(name='r', path=Ltree('r'))
+            root = Node(node_name='r', path=Ltree('r'))
             s.add(root)
-            child = Node(name='r.1', path=Ltree('r.50'))
-            child2 = Node(name='r.2', path=Ltree('r.70'))
-            grandchild = Node(name='r.1.1', path=Ltree('r.50.50'))
+            child = Node(node_name='r.1', path=Ltree('r.50'))
+            child2 = Node(node_name='r.2', path=Ltree('r.70'))
+            grandchild = Node(node_name='r.1.1', path=Ltree('r.50.50'))
             s.add(child)
             s.add(child2)
             s.add(grandchild)

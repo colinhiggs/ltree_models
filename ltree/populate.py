@@ -52,7 +52,7 @@ class LtreeBuilder:
             return
         for i in range(n_children):
             node = self.Node(
-                name=f'{parent.name}.{str(i)}',
+                node_name=f'{parent.node_name}.{str(i)}',
                 path=path_chooser(parent, i, n_children)
             )
             session.add(node)
@@ -62,7 +62,7 @@ class LtreeBuilder:
     def populate(self, depth, n_children, path_chooser=None):
         path_chooser = path_chooser or self.path_chooser_balanced
         with Session(self.engine, future=True) as s:
-            root = self.Node(name='r', path=Ltree('r'))
+            root = self.Node(node_name='r', path=Ltree('r'))
             s.add(root)
             self.recursive_add_children(s, root, depth, n_children, path_chooser)
             s.commit()

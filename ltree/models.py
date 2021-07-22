@@ -73,6 +73,10 @@ class Common:
         return func.subpath(cls.path, 0, -1)
 
     @declared_attr
+    def node_name(cls):
+        return Column(Text, nullable=False)
+
+    @declared_attr
     def parent(cls):
         return relationship(
             cls,
@@ -109,7 +113,7 @@ class Common:
         )
 
     def __repr__(self):
-        return f"{self.__class__.__name__}(id={self.id!r}, name={self.name!r}, path={self.path!r})"  # pylint: disable=no-member
+        return f"{self.__class__.__name__}(id={self.id!r}, node_name={self.node_name!r}, path={self.path!r})"  # pylint: disable=no-member
 
 
 @declarative_mixin
