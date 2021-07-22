@@ -90,6 +90,19 @@ class Common:
             viewonly=True,
         )
 
+    @declared_attr
+    def ancestors(cls):  # pylint: disable=no-self-argument
+        return relationship(
+            cls,
+            primaryjoin=lambda: and_(
+                remote(cls.path).op('@>', is_comparison=True)(foreign(cls.path)),
+                func.nlevel(remote(cls.path)) < func.nlevel(foreign(cls.path))
+            ),
+            order_by=lambda: cls.path,
+            uselist=True,
+            viewonly=True
+        )
+
     def set_new_path(self, new_path):
         cls = self.__class__
         s = object_session(self)
@@ -143,19 +156,6 @@ class OLtreeMixin(Common):
         return (
             Index(f'{cls.__tablename__}_path_idx', cls.path, postgresql_using='gist'),
             UniqueConstraint('path', deferrable=True, initially='immediate'),
-        )
-
-    @declared_attr
-    def ancestors(cls):  # pylint: disable=no-self-argument
-        return relationship(
-            cls,
-            primaryjoin=lambda: and_(
-                remote(cls.path).op('@>', is_comparison=True)(foreign(cls.path)),
-                func.nlevel(remote(cls.path)) < func.nlevel(foreign(cls.path))
-            ),
-            order_by=lambda: cls.path,
-            uselist=True,
-            viewonly=True
         )
 
     @hybrid_property
