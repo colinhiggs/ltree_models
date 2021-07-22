@@ -30,4 +30,5 @@ Base.metadata.drop_all(engine)
 Base.metadata.create_all(engine)
 unordered_builder = ltree.LtreeBuilder(engine, UnorderedNode)
 unordered_builder.populate(2, 3, unordered_builder.path_chooser_sequential)
-unordered_builder.print_tree()
+with Session(engine, future=True) as s:
+    unordered_builder.print_tree(s, with_name_path=True)
