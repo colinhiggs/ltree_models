@@ -68,7 +68,11 @@ class Common:
 
     @hybrid_property
     def parent_path(self):
-        return Ltree('.'.join(str(self.path).split('.')[:-1]))
+        elements = str(self.path).split('.')[:-1]
+        if elements:
+            return Ltree('.'.join(elements))
+        else:
+            return None
         # Or, if we wanted to get the database to do this for absolute
         # consistency:
         #
