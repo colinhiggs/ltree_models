@@ -30,7 +30,7 @@ logging.getLogger('sqlalchemy.dialects.postgresql').setLevel(logging.INFO)
 Base = declarative_base()
 
 id_type = Integer
-class Node(Base, ltree.OLtreeMixin):
+class ONode(Base, ltree.OLtreeMixin):
     __tablename__ = 'oltree_nodes'
     id = Column(id_type, primary_key=True)
 
@@ -38,8 +38,6 @@ class LNode(Base, ltree.LtreeMixin):
     __tablename__ = 'ltree_nodes'
     id = Column(id_type, primary_key=True)
 
-
-# Index(f'{Node.__tablename__}_path_idx', Node.path, postgresql_using='gist')
 
 db = testing.postgresql.Postgresql(
     base_dir='.',
@@ -58,46 +56,46 @@ ltree.add_ltree_extension(engine)
 Base.metadata.drop_all(engine)
 Base.metadata.create_all(engine)
 # ltree.add_oltree_functions(engine, max_digits=16, step_digits=8)
-tree_builder = ltree.LtreeBuilder(engine, Node, max_digits=6, step_digits=3)
+obuilder = ltree.OLtreeBuilder(engine, ONode, max_digits=6, step_digits=3)
 
-# tree_builder.populate(2, 3, tree_builder.path_chooser_free_path)
-tree_builder.populate(2, 3)
+# obuilder.populate(2, 3, obuilder.path_chooser_free_path)
+obuilder.populate(2, 3)
 
 ses = Session(engine)
-q = ses.query(Node).order_by(Node.path.desc()).limit(10)
+q = ses.query(ONode).order_by(ONode.path.desc()).limit(10)
 for node in reversed(q.all()):
     print(node, [str(n.path) for n in node.ancestors], node.parent_path)
 ses.close()
 
 with Session(engine) as s:
     engine.echo=True
-    for node in s.execute(select(Node).where(Node.parent_path==Ltree('r'))).scalars().all():
+    for node in s.execute(select(ONode).where(ONode.parent_path==Ltree('r'))).scalars().all():
         print(node)
 
     # print('*************************************************************')
     # pathlag = select(
-    #     Node.path, func.lag(Node.path).over(order_by=Node.path).label('lag')
+    #     ONode.path, func.lag(ONode.path).over(order_by=ONode.path).label('lag')
     # ).filter(
-    #     func.subpath(Node.path, 0, -1) == 'r'
+    #     func.subpath(ONode.path, 0, -1) == 'r'
     # ).subquery()
     # res = s.execute(
     #     select(pathlag).filter(pathlag.c.path == Ltree('r.500000'))
     # ).all()
     # print(res)
     #
-    item = s.execute(select(Node).where(Node.path==Ltree('r.500000'))).scalar_one()
+    item = s.execute(select(ONode).where(ONode.path==Ltree('r.500000'))).scalar_one()
     print(item)
     print(item.previous_sibling.path, item.next_sibling.path, item.parent.path)
     # item.relative_position=[item.next_sibling.path, 'r.750000.240000']
     item.previous_sibling_path=item.next_sibling.path + '__LAST__'
     s.commit()
-    # n2 = aliased(Node)
+    # n2 = aliased(ONode)
     # res = s.execute(
-    #     select(Node).filter(Node.previous_sibling == item)
+    #     select(ONode).filter(ONode.previous_sibling == item)
     # ).all()
     # print(res)
 
-tree_builder.print_tree()
+obuilder.print_tree()
 
 with Session(engine, future=True) as s:
     seq = Sequence('path_id_seq')
@@ -117,6 +115,15 @@ with Session(engine, future=True) as s:
     res = s.execute(select(LNode).order_by(LNode.path)).scalars().all()
     for node in res:
         print(node.node_name, node.path)
+    print(lroot.parent_path)
+    query = s.query(LNode).limit(2)
+    print('**********************************')
+    print(query)
+    print('**********************************')
+    for node in query.all():
+        print(node)
+lbuilder = ltree.LtreeBuilder(engine, LNode)
+lbuilder.print_tree()
 
 print(db.url())
 input('enter to quit...')
