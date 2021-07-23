@@ -50,7 +50,7 @@ class LtreeBuilder:
             self.recursive_add_children(session, node, depth - 1, n_children, path_chooser=path_chooser)
 
     def populate(self, depth, n_children, path_chooser=None):
-        path_chooser = path_chooser or self.path_chooser_balanced
+        path_chooser = path_chooser or default_path_chooser
         with Session(self.engine, future=True) as s:
             root = self.Node(node_name='r', path=Ltree('r'))
             s.add(root)
