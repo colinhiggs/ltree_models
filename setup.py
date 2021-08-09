@@ -31,6 +31,7 @@ setup(
     },
     description = 'sqlalchemy models for ltree.',
     long_description=README,
+    long_description_content_type='text/markdown',
     author = 'Colin Higgs',
     author_email = 'colin.higgs70@gmail.com',
     license = 'GNU Affero General Public License v3 or later (AGPLv3+)',
