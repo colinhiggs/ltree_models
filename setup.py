@@ -21,7 +21,7 @@ setup_requires = [
 ]
 
 setup(
-    name = 'ltree',
+    name = 'ltree_models',
     version_config = True,
     packages = find_packages(),
     setup_requires = setup_requires,
