@@ -1,5 +1,5 @@
 import logging
-import ltree
+import ltree_models
 import sqlalchemy
 import sys
 import testing.postgresql
@@ -32,11 +32,11 @@ logging.getLogger('sqlalchemy.dialects.postgresql').setLevel(logging.INFO)
 Base = declarative_base()
 
 id_type = Integer
-class ONode(Base, ltree.OLtreeMixin):
+class ONode(Base, ltree_models.OLtreeMixin):
     __tablename__ = 'oltree_nodes'
     id = Column(id_type, primary_key=True)
 
-class LNode(Base, ltree.LtreeMixin):
+class LNode(Base, ltree_models.LtreeMixin):
     __tablename__ = 'ltree_nodes'
     id = Column(id_type, primary_key=True)
 
@@ -54,11 +54,11 @@ psycopg2.extensions.register_adapter(
 )
 
 engine = create_engine(db.url(), echo=False)
-ltree.add_ltree_extension(engine)
+ltree_models.add_ltree_extension(engine)
 Base.metadata.drop_all(engine)
 Base.metadata.create_all(engine)
 # ltree.add_oltree_functions(engine, max_digits=16, step_digits=8)
-obuilder = ltree.OLtreeBuilder(engine, ONode, max_digits=6, step_digits=3)
+obuilder = ltree_models.OLtreeBuilder(engine, ONode, max_digits=6, step_digits=3)
 
 # obuilder.populate(2, 3, obuilder.path_chooser_free_path)
 obuilder.populate(2, 3)
@@ -132,7 +132,7 @@ with Session(engine, future=True) as s:
     # for node in query.all():
     #     print(node.path, [str(n.path) for n in node.children])
 
-# lbuilder = ltree.LtreeBuilder(engine, LNode)
+# lbuilder = ltree_models.LtreeBuilder(engine, LNode)
 # lbuilder.print_tree()
 
 print(db.url())

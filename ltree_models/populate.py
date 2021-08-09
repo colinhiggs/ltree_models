@@ -1,4 +1,4 @@
-import ltree
+import ltree_models
 
 from sqlalchemy import (
     select,
@@ -86,21 +86,21 @@ class OLtreeBuilder(LtreeBuilder):
     def __init__(
         self,
         engine, node_class,
-        max_digits=ltree.DEFAULT_MAX_DIGITS,
-        step_digits=ltree.DEFAULT_STEP_DIGITS
+        max_digits=ltree_models.DEFAULT_MAX_DIGITS,
+        step_digits=ltree_models.DEFAULT_STEP_DIGITS
     ):
         super().__init__(engine, node_class)
         self.set_digits(max_digits, step_digits)
 
     def set_digits(
         self,
-        max_digits=ltree.DEFAULT_MAX_DIGITS,
-        step_digits=ltree.DEFAULT_STEP_DIGITS
+        max_digits=ltree_models.DEFAULT_MAX_DIGITS,
+        step_digits=ltree_models.DEFAULT_STEP_DIGITS
     ):
         self.max_digits = max_digits
         self.max_number = 10 ** max_digits - 1
         self.step_digits = step_digits
         self.step_number = 10 ** step_digits
-        ltree.add_oltree_functions(
+        ltree_models.add_oltree_functions(
             self.engine, max_digits=max_digits, step_digits=step_digits
         )

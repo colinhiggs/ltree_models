@@ -1,5 +1,5 @@
 import logging
-import ltree
+import ltree_models
 import os
 import psycopg2
 import sqlalchemy
@@ -42,7 +42,7 @@ psycopg2.extensions.register_adapter(
 
 id_type = Integer
 Base = declarative_base()
-class Node(Base, ltree.OLtreeMixin):
+class Node(Base, ltree_models.OLtreeMixin):
     __tablename__ = 'oltree_nodes'
     id = Column(id_type, primary_key=True)
 
@@ -60,9 +60,7 @@ def setUpModule():
 
     db = testing.postgresql.Postgresql()
     engine = create_engine(db.url(), future=True)
-    ltree.add_ltree_extension(engine)
-
-    # Node = ltree.class_factory(Base, Integer)
+    ltree_models.add_ltree_extension(engine)
 
 
 def tearDownModule():
@@ -79,7 +77,7 @@ class DBBase(unittest.TestCase):
         self.Node = Node
         self.engine = engine
         Base.metadata.create_all(engine)
-        self.tree_builder = ltree.LtreeBuilder(
+        self.tree_builder = ltree_models.OLtreeBuilder(
             engine, Node, max_digits=6, step_digits=3
         )
 
