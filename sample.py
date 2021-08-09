@@ -1,5 +1,6 @@
 import logging
 import ltree
+import sqlalchemy
 import sys
 import testing.postgresql
 
@@ -18,6 +19,7 @@ from sqlalchemy.orm import (
     Query as BaseQuery,
     Session,
     aliased,
+    load_only,
 )
 from sqlalchemy.sql import (
     select,
@@ -98,6 +100,7 @@ with Session(engine) as s:
 obuilder.print_tree()
 
 with Session(engine, future=True) as s:
+    engine.echo=False
     seq = Sequence('path_id_seq')
     lroot = LNode(node_name='r', path=Ltree('r'))
     c1 = LNode(node_name='r.1', path=lroot.path + Ltree(str(LNode.next_path_id(s))))
@@ -111,20 +114,27 @@ with Session(engine, future=True) as s:
         print(node.node_name, node.path)
     c2.parent_path = lroot.path
     c1.parent_path = c2.path
+    c3 = LNode(node_name='r_3', path=lroot.path + Ltree(str(LNode.next_path_id(s))))
+    s.add(c3)
     s.commit()
     res = s.execute(select(LNode).order_by(LNode.path)).scalars().all()
     for node in res:
         print(node.node_name, node.path)
     print(lroot.parent_path)
-    query = s.query(LNode).limit(2)
-    print('**********************************')
-    print(query)
-    print('**********************************')
-    for node in query.all():
-        print(node)
-lbuilder = ltree.LtreeBuilder(engine, LNode)
-lbuilder.print_tree()
+    # Build a related query. Should get the children of lroot.
+    rel = sqlalchemy.inspect(LNode).mapper.relationships.get('children')
+    alnode = aliased(LNode)
+    query = s.query(LNode).select_from(alnode).join(
+        getattr(alnode, rel.key)
+    ).filter(alnode.id == lroot.id)
+    print(query.all())
+    print(lroot.children)
+    # for node in query.all():
+    #     print(node.path, [str(n.path) for n in node.children])
+
+# lbuilder = ltree.LtreeBuilder(engine, LNode)
+# lbuilder.print_tree()
 
 print(db.url())
-input('enter to quit...')
+# input('enter to quit...')
 db.stop()
