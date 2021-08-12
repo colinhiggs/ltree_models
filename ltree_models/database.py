@@ -51,6 +51,18 @@ def noretry_free_path_parent_sibling_text(
     prefix=DEFAULT_PREFIX, postfix=DEFAULT_POSTFIX,
     max_digits=DEFAULT_MAX_DIGITS, step_digits=DEFAULT_STEP_DIGITS,
 ):
+    '''
+    Text defining a database function which returns the next free path without retries.
+
+    Arguments:
+        table_name: name of the table which contains the nodes.
+        prefix: prefix to add to all names (table, function, etc.)
+        postfix: postfix to add to all names (table, function, etc.)
+        max_digits: maximum number of digits in the number associated with each
+            node at each path level.
+        step_digits: number of digits to use as the step when inserting children
+            at the beginning or end of the ordered set of children.
+    '''
     table_name = wrap_name(table_name, prefix=prefix, postfix=postfix)
     func_name = wrap_name('noretry_free_path_parent_sibling', prefix=prefix, postfix=postfix)
     format_text = 'FM' + '0' * max_digits
@@ -160,6 +172,18 @@ def noretry_free_path_text(
     prefix=DEFAULT_PREFIX, postfix=DEFAULT_POSTFIX,
     max_digits=DEFAULT_MAX_DIGITS, step_digits=DEFAULT_STEP_DIGITS,
 ):
+    '''
+    Text defining a database function which returns the next free path after a node.
+
+    Arguments:
+        table_name: name of the table which contains the nodes.
+        prefix: prefix to add to all names (table, function, etc.)
+        postfix: postfix to add to all names (table, function, etc.)
+        max_digits: maximum number of digits in the number associated with each
+            node at each path level.
+        step_digits: number of digits to use as the step when inserting children
+            at the beginning or end of the ordered set of children.
+    '''
     table_name = wrap_name(table_name, prefix=prefix, postfix=postfix)
     func_name = wrap_name('noretry_free_path', prefix=prefix, postfix=postfix)
     format_text = 'FM' + '0' * max_digits
@@ -276,6 +300,19 @@ def rebalance_text(
     prefix=DEFAULT_PREFIX, postfix=DEFAULT_POSTFIX,
     max_digits=DEFAULT_MAX_DIGITS, step_digits=DEFAULT_STEP_DIGITS,
 ):
+    '''
+    Text defining a database function which rebalances the ordinals of the children of a node.
+
+    Arguments:
+        table_name: name of the table which contains the nodes.
+        prefix: prefix to add to all names (table, function, etc.)
+        postfix: postfix to add to all names (table, function, etc.)
+        max_digits: maximum number of digits in the number associated with each
+            node at each path level.
+        step_digits: number of digits to use as the step when inserting children
+            at the beginning or end of the ordered set of children.
+    '''
+
     table_name = wrap_name(table_name, prefix=prefix, postfix=postfix)
     func_name = wrap_name('rebalance', prefix=prefix, postfix=postfix)
     format_text = 'FM' + '0' * max_digits
@@ -321,6 +358,18 @@ def free_path_parent_sibling_text(
     prefix=DEFAULT_PREFIX, postfix=DEFAULT_POSTFIX,
     max_digits=DEFAULT_MAX_DIGITS, step_digits=DEFAULT_STEP_DIGITS,
 ):
+    '''
+    Text defining a database function which returns the next free path with retries.
+
+    Arguments:
+        table_name: name of the table which contains the nodes.
+        prefix: prefix to add to all names (table, function, etc.)
+        postfix: postfix to add to all names (table, function, etc.)
+        max_digits: maximum number of digits in the number associated with each
+            node at each path level.
+        step_digits: number of digits to use as the step when inserting children
+            at the beginning or end of the ordered set of children.
+    '''
     table_name = wrap_name(table_name, prefix=prefix, postfix=postfix)
     func_name = wrap_name('free_path_parent_sibling', prefix=prefix, postfix=postfix)
     rebalance_name = wrap_name('rebalance', prefix=prefix, postfix=postfix)
@@ -348,6 +397,18 @@ def free_path_text(
     prefix=DEFAULT_PREFIX, postfix=DEFAULT_POSTFIX,
     max_digits=DEFAULT_MAX_DIGITS, step_digits=DEFAULT_STEP_DIGITS,
 ):
+    '''
+    Text defining a database function which returns the next free path with retries.
+
+    Arguments:
+        table_name: name of the table which contains the nodes.
+        prefix: prefix to add to all names (table, function, etc.)
+        postfix: postfix to add to all names (table, function, etc.)
+        max_digits: maximum number of digits in the number associated with each
+            node at each path level.
+        step_digits: number of digits to use as the step when inserting children
+            at the beginning or end of the ordered set of children.
+    '''
     table_name = wrap_name(table_name, prefix=prefix, postfix=postfix)
     func_name = wrap_name('free_path', prefix=prefix, postfix=postfix)
     rebalance_name = wrap_name('rebalance', prefix=prefix, postfix=postfix)
