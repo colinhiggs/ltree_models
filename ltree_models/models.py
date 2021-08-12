@@ -1,3 +1,18 @@
+'''
+Mixin classes which add tree node functionality based on Ltree paths.
+
+Each node will gain three columns:
+
+* `path` (Ltree): the path of this node.
+* `node_name` (Text): the name of this node.
+* `_path_id` (BigInteger Sequence): only there to hold a sequence. Do not use.
+
+LtreeMixin will produce tree nodes where there is no particular order amongst
+siblings in the tree.
+
+OLtreeMixin will produce an ordered and re-orderable tree: the path of each node
+is a dotted set of numbers where the numbers represent sibling order.
+'''
 import sqlalchemy
 
 from sqlalchemy_utils import LtreeType, Ltree
@@ -46,13 +61,24 @@ def subpath(path, offset, length=None):
 
 @declarative_mixin
 class Common:
+    '''
+    Common tree node functionality.
+    '''
 
     name_path_sep = '/'
 
+    # TODO
+    # Not sure how to make a sequence exist in the DB before other columns are
+    # created without attaching it to its own column.
     _path_id = Column(BigInteger, Sequence('path_id_seq'))
+    # But I'd really like to be able to do something like this:
+    # path_id_seq = Sequence('path_id_seq')
 
     @staticmethod
     def next_path_id(session):
+        '''
+        Get the next value of the sequence 'path_id_seq'.
+        '''
         seq = Sequence('path_id_seq')
         return session.execute(seq.next_value()).scalar_one()
 
@@ -68,6 +94,9 @@ class Common:
 
     @hybrid_property
     def parent_path(self):
+        '''
+        Path of the parent node (None if this node is root).
+        '''
         elements = str(self.path).split('.')[:-1]
         if elements:
             return Ltree('.'.join(elements))
@@ -89,6 +118,9 @@ class Common:
 
     @hybrid_property
     def name_path(self):
+        '''
+        Path of node_names separated by name_path_sep.
+        '''
         name_list = [node.node_name for node in self.ancestors]
         name_list.append(self.node_name)
         return self.name_path_sep.join(name_list)
@@ -116,6 +148,9 @@ class Common:
         )
 
     def set_new_path(self, new_path):
+        '''
+        Change the path of this node and update all children.
+        '''
         cls = self.__class__
         s = object_session(self)
         # with Session(object_session(self).get_bind(), future=True) as s:
@@ -148,6 +183,9 @@ class Common:
 
 @declarative_mixin
 class LtreeMixin(Common):
+    '''
+    Unordered tree nodes using Ltree path.
+    '''
 
     @declared_attr
     def __table_args__(cls):  # pylint: disable=no-self-argument
@@ -162,6 +200,9 @@ class LtreeMixin(Common):
 
 @declarative_mixin
 class OLtreeMixin(Common):
+    '''
+    Ordered tree nodes using Ltree path.
+    '''
 
     @declared_attr
     def __table_args__(cls):  # pylint: disable=no-self-argument
